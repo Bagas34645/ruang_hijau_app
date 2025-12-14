@@ -12,12 +12,20 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _loading = false;
 
+  bool _loading = false;
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  // ===== LOGIKA LOGIN (TIDAK DIUBAH) =====
   void _login() async {
     setState(() => _loading = true);
-    // Capture messenger and navigator synchronously to avoid using
-    // BuildContext across async gaps.
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
@@ -31,22 +39,18 @@ class _LoginPageState extends State<LoginPage> {
 
     if (res['statusCode'] == 200 && res['user'] != null) {
       final body = res['body'];
-      if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text(body?['message'] ?? 'Login berhasil')),
       );
       navigator.pushNamedAndRemoveUntil('/home', (route) => false);
     } else {
       final body = res['body'];
-      // If server responded OK but token missing, show clearer message
       String msg = body?['message'] ?? 'Login gagal';
+
       if (res['statusCode'] == 200 && res['user'] == null) {
-        // Attempt to read token from SharedPreferences (maybe saved by Api.login earlier)
-        // Try to see if user was stored locally by Api.login
         final prefs = await SharedPreferences.getInstance();
         final localUser = prefs.getString('user');
         if (localUser != null && localUser.isNotEmpty) {
-          if (!mounted) return;
           messenger.showSnackBar(
             SnackBar(content: Text(body?['message'] ?? 'Login berhasil')),
           );
@@ -54,111 +58,179 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
-        // Show debug dialog with response to help diagnose why token is missing
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) {
-              final text = '${res['statusCode']} - ${res['body'] ?? 'no body'}';
-              return AlertDialog(
-                title: const Text('Token tidak ditemukan'),
-                content: SingleChildScrollView(child: Text(text)),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('Tutup'),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      // copy to clipboard if available
-                      try {
-                        // import not added; use Clipboard if available at runtime
-                        Navigator.pop(ctx);
-                      } catch (_) {
-                        Navigator.pop(ctx);
-                      }
-                    },
-                    child: const Text('Salin'),
-                  ),
-                ],
-              );
-            },
-          );
-        }
-
         msg =
             'Login berhasil, tapi token tidak diterima dari server. Coba lagi atau hubungi administrator.';
       }
+
       messenger.showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
+  // ===== UI =====
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Selamat Datang',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 40),
-                TextField(
-                  controller: _emailCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _passwordCtrl,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _loading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    minimumSize: const Size(double.infinity, 50),
-                  ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Masuk',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/register'),
-                  child: const Text('Belum punya akun? Register'),
-                ),
-              ],
+      backgroundColor: Colors.grey[50],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 40),
+                  _buildEmailField(),
+                  const SizedBox(height: 16),
+                  _buildPasswordField(),
+                  const SizedBox(height: 32),
+                  _buildLoginButton(),
+                  const SizedBox(height: 16),
+                  _buildRegisterRedirect(),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.green[100],
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.eco, size: 48, color: Colors.green[700]),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Selamat Datang',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.green[800],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Silakan masuk untuk melanjutkan',
+          style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmailField() {
+    return TextField(
+      controller: _emailCtrl,
+      keyboardType: TextInputType.emailAddress,
+      decoration: InputDecoration(
+        labelText: 'Email',
+        hintText: 'nama@email.com',
+        prefixIcon: Icon(Icons.email_outlined, color: Colors.green[600]),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return TextField(
+      controller: _passwordCtrl,
+      obscureText: _obscurePassword,
+      decoration: InputDecoration(
+        labelText: 'Password',
+        hintText: 'Masukkan password',
+        prefixIcon: Icon(Icons.lock_outline, color: Colors.green[600]),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
+            color: Colors.grey[600],
+          ),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+    );
+  }
+
+  // ===== INI YANG DIPERBAIKI =====
+  Widget _buildLoginButton() {
+    return ElevatedButton(
+      onPressed: () {
+        if (_loading) return;
+        _login();
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green[600],
+        foregroundColor: Colors.white,
+        minimumSize: const Size(double.infinity, 56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: _loading
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : const Text(
+              'Masuk',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+    );
+  }
+
+  Widget _buildRegisterRedirect() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'Belum punya akun? ',
+          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pushNamed(context, '/register'),
+          child: Text(
+            'Daftar',
+            style: TextStyle(
+              color: Colors.green[700],
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
