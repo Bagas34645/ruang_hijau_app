@@ -114,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen>
       child: Column(
         children: [
           Text(
-            "Ruang Hijau",
+            "RuangHijau",
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
