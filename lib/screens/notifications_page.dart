@@ -36,24 +36,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
       'read': true,
       'avatar': 'https://picsum.photos/202',
     },
-    {
-      'id': 4,
-      'type': 'event',
-      'username': 'Sistem',
-      'message': 'Event "Tanam Pohon Bersama" akan dimulai besok',
-      'time': '2 jam yang lalu',
-      'read': true,
-      'avatar': null,
-    },
-    {
-      'id': 5,
-      'type': 'like',
-      'username': 'Clean Earth',
-      'message': 'menyukai postingan Anda',
-      'time': '3 jam yang lalu',
-      'read': true,
-      'avatar': 'https://picsum.photos/203',
-    },
   ];
 
   void _markAsRead(int id) {

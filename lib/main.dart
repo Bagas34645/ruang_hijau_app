@@ -10,6 +10,7 @@ import 'screens/volunteer_page.dart';
 import 'screens/create_campaign_page.dart';
 import 'screens/all_donations_page.dart';
 import 'screens/my_volunteer_page.dart';
+import 'screens/payment_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -38,6 +39,7 @@ class MyApp extends StatelessWidget {
         '/create-campaign': (c) => const CreateCampaignPage(),
         '/all-donations': (c) => const AllDonationsPage(),
         '/my-volunteer': (c) => const MyVolunteerPage(),
+        '/payment': (c) => const PaymentPage(),
       },
     );
   }

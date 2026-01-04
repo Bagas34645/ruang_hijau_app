@@ -12,18 +12,11 @@ class _DonationPageState extends State<DonationPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
-  
+
   int? selectedAmount;
   bool isAnonymous = false;
-  
-  final List<int> quickAmounts = [
-    10000,
-    25000,
-    50000,
-    100000,
-    250000,
-    500000,
-  ];
+
+  final List<int> quickAmounts = [10000, 25000, 50000, 100000, 250000, 500000];
 
   String formatCurrency(int amount) {
     return 'Rp ${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
@@ -44,52 +37,47 @@ class _DonationPageState extends State<DonationPage> {
       return;
     }
 
-    if (!isAnonymous && _nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mohon masukkan nama Anda')),
-      );
-      return;
-    }
+    // Tidak perlu validasi nama jika anonim
+    // if (!isAnonymous && _nameController.text.isEmpty) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(content: Text('Mohon masukkan nama Anda')),
+    //   );
+    //   return;
+    // }
 
-    // Show success dialog
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Donasi Berhasil!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Terima kasih atas donasi Anda!'),
-            const SizedBox(height: 16),
-            Text('Jumlah: ${formatCurrency(selectedAmount!)}'),
-            Text('Kampanye: ${campaign['title']}'),
-            if (!isAnonymous) Text('Atas nama: ${_nameController.text}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    // Navigate to payment page
+    Navigator.pushNamed(
+      context,
+      '/payment',
+      arguments: {
+        'amount': selectedAmount!,
+        'campaign': campaign['title'],
+        'donorName': isAnonymous
+            ? 'Anonim'
+            : _nameController.text.isEmpty
+            ? 'Anonim'
+            : _nameController.text,
+        'email': _emailController.text,
+        'message': _messageController.text,
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final campaign = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-    
+    final campaign =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Donasi'),
-      ),
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(title: const Text('Donasi')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -110,28 +98,22 @@ class _DonationPageState extends State<DonationPage> {
                     const SizedBox(height: 8),
                     Text(
                       campaign['description'],
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Quick Amount Selection
             const Text(
               'Pilih Nominal Donasi',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            
+
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -145,7 +127,7 @@ class _DonationPageState extends State<DonationPage> {
               itemBuilder: (context, index) {
                 final amount = quickAmounts[index];
                 final isSelected = selectedAmount == amount;
-                
+
                 return OutlinedButton(
                   onPressed: () => selectAmount(amount),
                   style: OutlinedButton.styleFrom(
@@ -166,9 +148,9 @@ class _DonationPageState extends State<DonationPage> {
                 );
               },
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Custom Amount
             TextField(
               controller: _amountController,
@@ -185,9 +167,9 @@ class _DonationPageState extends State<DonationPage> {
                 });
               },
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Anonymous Checkbox
             CheckboxListTile(
               title: const Text('Donasi sebagai Anonim'),
@@ -200,20 +182,17 @@ class _DonationPageState extends State<DonationPage> {
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Donor Information
             if (!isAnonymous) ...[
               const Text(
                 'Informasi Donatur',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              
+
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -222,9 +201,9 @@ class _DonationPageState extends State<DonationPage> {
                   prefixIcon: Icon(Icons.person),
                 ),
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -236,9 +215,9 @@ class _DonationPageState extends State<DonationPage> {
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 16),
-            
+
             // Message
             TextField(
               controller: _messageController,
@@ -249,9 +228,9 @@ class _DonationPageState extends State<DonationPage> {
                 hintText: 'Tulis pesan dukungan Anda...',
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Donate Button
             SizedBox(
               width: double.infinity,
@@ -263,9 +242,9 @@ class _DonationPageState extends State<DonationPage> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: Text(
-                  selectedAmount != null 
-                    ? 'Donasi ${formatCurrency(selectedAmount!)}'
-                    : 'Donasi Sekarang',
+                  selectedAmount != null
+                      ? 'Donasi ${formatCurrency(selectedAmount!)}'
+                      : 'Donasi Sekarang',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -273,9 +252,9 @@ class _DonationPageState extends State<DonationPage> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Info Card
             Card(
               color: Colors.blue[50],
@@ -288,10 +267,7 @@ class _DonationPageState extends State<DonationPage> {
                     Expanded(
                       child: Text(
                         'Donasi Anda akan langsung disalurkan untuk membantu kampanye ini.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue[700],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.blue[700]),
                       ),
                     ),
                   ],
