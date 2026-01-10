@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api.dart';
+import '../config/app_config.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -34,22 +35,38 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadUserPosts() async {
     try {
+      print('DEBUG: Loading user posts for user_id: $userId');
       final res = await Api.fetchPosts();
       if (!mounted) return;
+
+      print('DEBUG: Profile response statusCode: ${res['statusCode']}');
+
       if (res['statusCode'] == 200 && res['body'] != null && userId != null) {
-        final data = res['body'] as List<dynamic>;
+        final body = res['body'] as Map<String, dynamic>;
+        final data = body['data'] as List<dynamic>? ?? [];
+
+        print('DEBUG: Total posts: ${data.length}');
+
         final filtered = data.where((e) => e['user_id'] == userId).toList();
+
+        print('DEBUG: Filtered posts for user $userId: ${filtered.length}');
+
         userPosts = filtered.map((e) {
+          final imageUrl = AppConfig.getImageUrl(e['image']);
+          print('DEBUG: Post ${e['id']} image URL: $imageUrl');
+
           return {
             'id': e['id'],
-            'imageUrl': e['image'] ?? 'https://picsum.photos/300/300',
+            'imageUrl': imageUrl,
             'caption': e['text'] ?? '',
           };
         }).toList();
       } else {
+        print('DEBUG: No data or error in response');
         userPosts = [];
       }
     } catch (e) {
+      print('DEBUG: Error loading user posts: $e');
       userPosts = [];
     } finally {
       if (mounted) {

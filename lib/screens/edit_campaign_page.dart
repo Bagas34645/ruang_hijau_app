@@ -4,31 +4,33 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:async';
 import '../services/api.dart';
 import '../config/app_config.dart';
 
-class CreateCampaignPage extends StatefulWidget {
-  const CreateCampaignPage({super.key});
+class EditCampaignPage extends StatefulWidget {
+  final Map<String, dynamic> campaign;
+
+  const EditCampaignPage({super.key, required this.campaign});
 
   @override
-  State<CreateCampaignPage> createState() => _CreateCampaignPageState();
+  State<EditCampaignPage> createState() => _EditCampaignPageState();
 }
 
-class _CreateCampaignPageState extends State<CreateCampaignPage> {
+class _EditCampaignPageState extends State<EditCampaignPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _targetController = TextEditingController();
-  final TextEditingController _durationController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _contactController = TextEditingController();
+  late TextEditingController _titleController;
+  late TextEditingController _descriptionController;
+  late TextEditingController _targetController;
+  late TextEditingController _durationController;
+  late TextEditingController _locationController;
+  late TextEditingController _contactController;
 
   File? _selectedImage;
-  Uint8List? _webImage; // For web support
+  Uint8List? _webImage;
   String? selectedCategory;
   bool needVolunteers = true;
   bool _isSubmitting = false;
+  String? _existingImageUrl;
 
   final List<String> categories = [
     'Lingkungan',
@@ -43,8 +45,43 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
 
   final ImagePicker _picker = ImagePicker();
 
-  // Helper method to check if image is selected
-  bool get hasImage => _selectedImage != null || _webImage != null;
+  bool get hasNewImage => _selectedImage != null || _webImage != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    _titleController = TextEditingController(
+      text: widget.campaign['title'] ?? '',
+    );
+    _descriptionController = TextEditingController(
+      text: widget.campaign['description'] ?? '',
+    );
+    _targetController = TextEditingController(
+      text: formatCurrency(widget.campaign['target_amount']?.toString() ?? '0'),
+    );
+    _durationController = TextEditingController(
+      text: widget.campaign['duration_days']?.toString() ?? '',
+    );
+    _locationController = TextEditingController(
+      text: widget.campaign['location'] ?? '',
+    );
+    _contactController = TextEditingController(
+      text: widget.campaign['contact'] ?? '',
+    );
+
+    selectedCategory = widget.campaign['category'];
+    needVolunteers = widget.campaign['need_volunteers'] ?? true;
+
+    // Set existing image URL
+    if (widget.campaign['image'] != null &&
+        widget.campaign['image'].toString().isNotEmpty) {
+      _existingImageUrl = AppConfig.getImageUrl(widget.campaign['image']);
+    }
+  }
 
   Future<void> _pickImage() async {
     try {
@@ -57,13 +94,11 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
 
       if (image != null) {
         if (kIsWeb) {
-          // For web platform
           final bytes = await image.readAsBytes();
           setState(() {
             _webImage = bytes;
           });
         } else {
-          // For mobile/desktop platform
           setState(() {
             _selectedImage = File(image.path);
           });
@@ -71,8 +106,8 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: const [
+            content: const Row(
+              children: [
                 Icon(Icons.check_circle, color: Colors.white),
                 SizedBox(width: 12),
                 Text('Gambar berhasil dipilih!'),
@@ -94,7 +129,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
             children: [
               const Icon(Icons.error_outline, color: Colors.white),
               const SizedBox(width: 12),
-              Text('Error memilih gambar: $e'),
+              Expanded(child: Text('Error memilih gambar: $e')),
             ],
           ),
           backgroundColor: Colors.red,
@@ -107,6 +142,14 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
     }
   }
 
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+      _webImage = null;
+      _existingImageUrl = null;
+    });
+  }
+
   String formatCurrency(String value) {
     if (value.isEmpty) return '';
     final number = int.tryParse(value.replaceAll('.', '')) ?? 0;
@@ -116,196 +159,70 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
     );
   }
 
-  void _submitCampaign() async {
-    print('═══════════════════════════════════════════════════════');
-    print('🚀 SUBMIT CAMPAIGN BUTTON CLICKED');
-    print('═══════════════════════════════════════════════════════');
-
+  void _updateCampaign() async {
     if (_formKey.currentState!.validate()) {
-      print('✅ Form validation passed');
-
-      // Check if image is selected
-      if (!hasImage) {
-        print('❌ No image selected');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.image_not_supported, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Mohon pilih gambar kampanye'),
-              ],
-            ),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+      if (selectedCategory == null) {
+        _showSnackBar('Mohon pilih kategori kampanye', Colors.orange);
         return;
       }
 
-      print('✅ Image selected');
+      if (!hasNewImage && _existingImageUrl == null) {
+        _showSnackBar('Mohon pilih gambar kampanye', Colors.orange);
+        return;
+      }
 
-      // Get user ID from shared preferences
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id');
 
-      print('📝 User ID from SharedPreferences: $userId');
-
       if (userId == null) {
-        print('❌ User not logged in');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Anda harus login terlebih dahulu'),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        _showSnackBar('Anda harus login terlebih dahulu', Colors.red);
         return;
       }
 
       setState(() => _isSubmitting = true);
-      print('⏳ Setting isSubmitting = true');
 
       try {
-        // Clean and validate data
-        final targetAmount = _targetController.text.replaceAll('.', '').trim();
-        final durationDays = _durationController.text.trim();
-
-        // Validate numeric values
-        if (int.tryParse(targetAmount) == null ||
-            int.parse(targetAmount) < 100000) {
-          print('❌ Invalid target amount: $targetAmount');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('Target dana minimal Rp 100.000'),
-                  ],
-                ),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
-          }
-          setState(() => _isSubmitting = false);
-          return;
-        }
-
-        if (int.tryParse(durationDays) == null) {
-          print('❌ Invalid duration: $durationDays');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.white),
-                    SizedBox(width: 12),
-                    Text('Durasi harus berupa angka'),
-                  ],
-                ),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
-          }
-          setState(() => _isSubmitting = false);
-          return;
-        }
-
-        // Prepare form data with validated values
         final formData = {
-          'creator_id': userId.toString(),
-          'title': _titleController.text.trim(),
-          'description': _descriptionController.text.trim(),
-          'target_amount': targetAmount,
+          'title': _titleController.text,
+          'description': _descriptionController.text,
+          'target_amount': _targetController.text.replaceAll('.', ''),
           'category': selectedCategory,
-          'location': _locationController.text.trim(),
-          'contact': _contactController.text.trim(),
-          'duration_days': durationDays,
+          'location': _locationController.text,
+          'contact': _contactController.text,
+          'duration_days': _durationController.text,
           'need_volunteers': needVolunteers ? 'true' : 'false',
         };
 
-        print('═══════════════════════════════════════════════════════');
-        print('📦 CAMPAIGN DATA BEING SUBMITTED');
-        print('═══════════════════════════════════════════════════════');
-        formData.forEach((key, value) {
-          print('  $key: $value (type: ${value.runtimeType})');
-        });
-        print('═══════════════════════════════════════════════════════');
+        print('DEBUG: Updating campaign with data: $formData');
 
-        // Prepare image
         String? imageFilename;
         Uint8List? imageBytes;
 
-        if (kIsWeb && _webImage != null) {
-          imageBytes = _webImage;
-          imageFilename =
-              'campaign_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          print('🖼️  Web image prepared: ${imageBytes!.length} bytes');
-        } else if (_selectedImage != null) {
-          imageBytes = await _selectedImage!.readAsBytes();
-          imageFilename =
-              'campaign_${DateTime.now().millisecondsSinceEpoch}_${_selectedImage!.path.split('/').last}';
-          print('🖼️  Mobile image prepared: ${imageBytes!.length} bytes');
+        if (hasNewImage) {
+          if (kIsWeb && _webImage != null) {
+            imageBytes = _webImage;
+            imageFilename =
+                'campaign_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          } else if (_selectedImage != null) {
+            imageBytes = await _selectedImage!.readAsBytes();
+            imageFilename =
+                'campaign_${DateTime.now().millisecondsSinceEpoch}_${_selectedImage!.path.split('/').last}';
+          }
         }
 
-        print('📸 Image filename: $imageFilename');
-        print('📸 Image bytes length: ${imageBytes?.length ?? 0} bytes');
+        final response = await Api.updateCampaignMultipart(
+          widget.campaign['id'] as int,
+          formData,
+          imageBytes: imageBytes,
+          filename: imageFilename,
+        );
 
-        // Print API base URL for debugging
-        print('🌐 API Base URL: ${AppConfig.baseUrl}');
-        print('🌐 Full endpoint: ${AppConfig.baseUrl}/api/campaigns/');
-
-        // Call API with timeout
-        print('📡 Calling API.createCampaignMultipart...');
-        final response =
-            await Api.createCampaignMultipart(
-              formData,
-              imageBytes: imageBytes,
-              filename: imageFilename,
-            ).timeout(
-              const Duration(seconds: 15),
-              onTimeout: () {
-                print('⏰ API call TIMEOUT after 15 seconds');
-                throw TimeoutException(
-                  'Request timeout. Pastikan server backend sedang berjalan.',
-                );
-              },
-            );
-
-        print('═══════════════════════════════════════════════════════');
-        print('📨 API RESPONSE RECEIVED');
-        print('═══════════════════════════════════════════════════════');
-        print('Status Code: ${response['statusCode']}');
-        print('Body: ${response['body']}');
-        print('═══════════════════════════════════════════════════════');
+        print('DEBUG: API response statusCode=${response['statusCode']}');
+        print('DEBUG: API response body=${response['body']}');
 
         setState(() => _isSubmitting = false);
 
-        if (response['statusCode'] == 201 || response['statusCode'] == 200) {
-          print('✅ Campaign created successfully!');
-          // Show success dialog
+        if (response['statusCode'] == 200 || response['statusCode'] == 201) {
           if (mounted) {
             showDialog(
               context: context,
@@ -331,7 +248,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
-                        'Kampanye Dibuat!',
+                        'Kampanye Diperbarui!',
                         style: TextStyle(fontSize: 20),
                       ),
                     ),
@@ -342,7 +259,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Kampanye Anda berhasil dibuat dan akan segera ditinjau oleh tim kami.',
+                      'Kampanye Anda berhasil diperbarui.',
                       style: TextStyle(fontSize: 15),
                     ),
                     const SizedBox(height: 16),
@@ -380,39 +297,13 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Colors.blue[700],
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'Kampanye Anda akan tampil di halaman kampanye setelah disetujui.',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
                 actions: [
                   TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop(); // Close dialog
-                      Navigator.of(
-                        context,
-                      ).pop({'success': true}); // Return to campaign list
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pop({'success': true});
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFF43A047),
@@ -425,117 +316,37 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text(
-                      'OK',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                    child: const Text('OK'),
                   ),
                 ],
               ),
             );
           }
         } else {
-          // API returned an error
-          final errorMsg = response['body'] != null
-              ? response['body']['message'] ?? 'Gagal membuat kampanye'
-              : 'Gagal membuat kampanye. Status: ${response['statusCode']}';
-
-          print('═══════════════════════════════════════════════════════');
-          print('❌ ERROR: API returned status ${response['statusCode']}');
-          print('Message: $errorMsg');
-          print('═══════════════════════════════════════════════════════');
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.white),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        errorMsg.toString(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
-          }
+          final errorMsg =
+              response['body']?['message'] ?? 'Gagal memperbarui kampanye';
+          _showSnackBar(errorMsg, Colors.red);
         }
-      } catch (e, stackTrace) {
+      } catch (e) {
         setState(() => _isSubmitting = false);
-        print('═══════════════════════════════════════════════════════');
-        print('💥 EXCEPTION: Error submitting campaign');
-        print('═══════════════════════════════════════════════════════');
-        print('Error: $e');
-        print('Type: ${e.runtimeType}');
-        print('Stack Trace:');
-        print(stackTrace);
-        print('═══════════════════════════════════════════════════════');
-
-        if (mounted) {
-          String displayError = 'Terjadi kesalahan';
-
-          if (e is TimeoutException) {
-            displayError =
-                'Koneksi timeout. Pastikan server backend sedang berjalan di ${AppConfig.baseUrl}';
-          } else if (e.toString().contains('Connection refused')) {
-            displayError =
-                'Gagal terhubung ke server ${AppConfig.baseUrl}. Pastikan backend sedang berjalan.';
-          } else if (e.toString().contains('Network') ||
-              e.toString().contains('SocketException')) {
-            displayError =
-                'Kesalahan jaringan. Periksa koneksi internet Anda dan pastikan backend berjalan.';
-          } else {
-            displayError = 'Error: ${e.toString()}';
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      displayError,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
+        print('DEBUG: Error updating campaign: $e');
+        _showSnackBar('Error: $e', Colors.red);
       }
-    } else {
-      print('❌ Form validation FAILED');
+    }
+  }
+
+  void _showSnackBar(String message, Color backgroundColor) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.warning, color: Colors.white),
-              SizedBox(width: 12),
-              Text('Mohon lengkapi semua field yang diperlukan'),
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(child: Text(message)),
             ],
           ),
-          backgroundColor: Colors.orange,
+          backgroundColor: backgroundColor,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -561,12 +372,114 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
     );
   }
 
+  Widget _buildImagePreview() {
+    if (hasNewImage) {
+      if (kIsWeb && _webImage != null) {
+        return Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(
+                _webImage!,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: _removeImage,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 16),
+                ),
+              ),
+            ),
+          ],
+        );
+      } else if (_selectedImage != null) {
+        return Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                _selectedImage!,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: _removeImage,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 16),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+    } else if (_existingImageUrl != null) {
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              _existingImageUrl!,
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 200,
+                  width: double.infinity,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.image_not_supported),
+                );
+              },
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: _removeImage,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Buat Kampanye Baru'),
+        title: const Text('Edit Kampanye'),
         backgroundColor: const Color(0xFF43A047),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -580,37 +493,33 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
             children: [
               // Info Card
               Card(
-                color: Colors.green[50],
+                color: Colors.blue[50],
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.green[200]!),
+                  side: BorderSide(color: Colors.blue[200]!),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.green[700]),
+                      Icon(Icons.info_outline, color: Colors.blue[700]),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Buat kampanye untuk menggalang dana dan relawan untuk kegiatan sosial Anda.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.green[900],
-                          ),
+                          'Edit informasi kampanye Anda',
+                          style: TextStyle(color: Colors.blue[700]),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
 
               // Campaign Image
               const Text(
-                'Gambar Kampanye *',
+                'Gambar Kampanye',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -624,79 +533,31 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   height: 200,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    border: Border.all(color: Colors.grey[300]!),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: hasImage ? Colors.green : Colors.grey[300]!,
-                      width: hasImage ? 2 : 1,
-                    ),
                   ),
-                  child: hasImage
-                      ? Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: kIsWeb
-                                  ? Image.memory(
-                                      _webImage!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    )
-                                  : Image.file(
-                                      _selectedImage!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.black54,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.edit,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      : Column(
+                  child: _buildImagePreview().runtimeType == SizedBox
+                      ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.add_photo_alternate,
-                              size: 64,
+                              size: 48,
                               color: Colors.grey[400],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 12),
                             Text(
-                              'Tap untuk pilih gambar',
+                              'Pilih Gambar Baru',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 14,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Ukuran maksimal 5MB',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
-                              ),
-                            ),
                           ],
-                        ),
+                        )
+                      : _buildImagePreview(),
                 ),
               ),
-
               const SizedBox(height: 24),
 
               // Basic Information
@@ -720,7 +581,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   prefixIcon: const Icon(Icons.title),
-                  helperText: 'Judul yang menarik dan deskriptif',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -732,11 +592,10 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 12),
 
               DropdownButtonFormField<String>(
-                value: selectedCategory,
+                initialValue: selectedCategory,
                 decoration: InputDecoration(
                   labelText: 'Kategori *',
                   filled: true,
@@ -757,14 +616,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                     selectedCategory = value;
                   });
                 },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Kategori tidak boleh kosong';
-                  }
-                  return null;
-                },
               ),
-
               const SizedBox(height: 12),
 
               TextFormField(
@@ -778,7 +630,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   alignLabelWithHint: true,
-                  helperText: 'Jelaskan tujuan dan manfaat kampanye Anda',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -790,7 +641,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 24),
 
               // Target & Duration
@@ -816,15 +666,14 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   ),
                   prefixText: 'Rp ',
                   prefixIcon: const Icon(Icons.attach_money),
-                  helperText: 'Masukkan target dana yang dibutuhkan',
                 ),
                 onChanged: (value) {
                   final formatted = formatCurrency(value.replaceAll('.', ''));
                   if (formatted != value) {
-                    _targetController.value = TextEditingValue(
+                    _targetController.value = _targetController.value.copyWith(
                       text: formatted,
-                      selection: TextSelection.collapsed(
-                        offset: formatted.length,
+                      selection: TextSelection.fromPosition(
+                        TextPosition(offset: formatted.length),
                       ),
                     );
                   }
@@ -835,12 +684,11 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   }
                   final number = int.tryParse(value.replaceAll('.', ''));
                   if (number == null || number < 100000) {
-                    return 'Target dana minimal Rp 100.000';
+                    return 'Target minimum Rp 100.000';
                   }
                   return null;
                 },
               ),
-
               const SizedBox(height: 12),
 
               TextFormField(
@@ -854,7 +702,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   prefixIcon: const Icon(Icons.calendar_today),
-                  helperText: 'Berapa hari kampanye akan berlangsung',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -862,7 +709,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   }
                   final days = int.tryParse(value);
                   if (days == null || days < 7) {
-                    return 'Durasi minimal 7 hari';
+                    return 'Durasi minimum 7 hari';
                   }
                   if (days > 365) {
                     return 'Durasi maksimal 365 hari';
@@ -870,7 +717,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 24),
 
               // Location & Contact
@@ -894,7 +740,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   prefixIcon: const Icon(Icons.location_on),
-                  helperText: 'Dimana kegiatan ini akan berlangsung',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -903,7 +748,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 12),
 
               TextFormField(
@@ -917,7 +761,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   prefixIcon: const Icon(Icons.phone),
-                  helperText: 'Nomor yang bisa dihubungi',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -926,7 +769,6 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 24),
 
               // Volunteer Option
@@ -967,7 +809,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitCampaign,
+                  onPressed: _isSubmitting ? null : _updateCampaign,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF43A047),
                     foregroundColor: Colors.white,
@@ -993,7 +835,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                             ),
                             const SizedBox(width: 12),
                             const Text(
-                              'Membuat Kampanye...',
+                              'Memperbarui Kampanye...',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -1002,7 +844,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
                           ],
                         )
                       : const Text(
-                          'Buat Kampanye',
+                          'Perbarui Kampanye',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

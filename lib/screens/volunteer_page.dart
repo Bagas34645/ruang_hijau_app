@@ -15,10 +15,10 @@ class _VolunteerPageState extends State<VolunteerPage> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _experienceController = TextEditingController();
   final TextEditingController _motivationController = TextEditingController();
-  
+
   String? selectedSkill;
   String? selectedAvailability;
-  
+
   final List<String> skills = [
     'Penggalangan Dana',
     'Komunikasi & Media Sosial',
@@ -29,7 +29,7 @@ class _VolunteerPageState extends State<VolunteerPage> {
     'Teknologi',
     'Lainnya',
   ];
-  
+
   final List<String> availabilities = [
     'Penuh Waktu',
     'Paruh Waktu',
@@ -45,7 +45,7 @@ class _VolunteerPageState extends State<VolunteerPage> {
         );
         return;
       }
-      
+
       if (selectedAvailability == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Mohon pilih ketersediaan waktu Anda')),
@@ -91,12 +91,11 @@ class _VolunteerPageState extends State<VolunteerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final campaign = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-    
+    final campaign =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Daftar Relawan'),
-      ),
+      appBar: AppBar(title: const Text('Daftar Relawan')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -129,28 +128,22 @@ class _VolunteerPageState extends State<VolunteerPage> {
                       const SizedBox(height: 8),
                       Text(
                         'Bergabunglah dengan ${campaign['volunteers']} relawan lainnya untuk membantu kampanye ini!',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                     ],
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Personal Information
               const Text(
                 'Informasi Pribadi',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -165,9 +158,9 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -186,9 +179,9 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -204,9 +197,9 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _addressController,
                 maxLines: 2,
@@ -222,31 +215,25 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Skills and Availability
               const Text(
                 'Keahlian & Ketersediaan',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              
+
               DropdownButtonFormField<String>(
-                value: selectedSkill,
+                initialValue: selectedSkill,
                 decoration: const InputDecoration(
                   labelText: 'Keahlian *',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.work),
                 ),
                 items: skills.map((skill) {
-                  return DropdownMenuItem(
-                    value: skill,
-                    child: Text(skill),
-                  );
+                  return DropdownMenuItem(value: skill, child: Text(skill));
                 }).toList(),
                 onChanged: (value) {
                   setState(() {
@@ -254,11 +241,11 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   });
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               DropdownButtonFormField<String>(
-                value: selectedAvailability,
+                initialValue: selectedAvailability,
                 decoration: const InputDecoration(
                   labelText: 'Ketersediaan Waktu *',
                   border: OutlineInputBorder(),
@@ -276,9 +263,9 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   });
                 },
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _experienceController,
                 maxLines: 3,
@@ -288,16 +275,17 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   hintText: 'Ceritakan pengalaman Anda sebagai relawan...',
                 ),
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               TextFormField(
                 controller: _motivationController,
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Motivasi *',
                   border: OutlineInputBorder(),
-                  hintText: 'Mengapa Anda ingin menjadi relawan untuk kampanye ini?',
+                  hintText:
+                      'Mengapa Anda ingin menjadi relawan untuk kampanye ini?',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -306,9 +294,9 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Info Card
               Card(
                 color: Colors.orange[50],
@@ -341,19 +329,31 @@ class _VolunteerPageState extends State<VolunteerPage> {
                           children: [
                             Text(
                               '• Membantu dalam kegiatan kampanye',
-                              style: TextStyle(fontSize: 12, color: Colors.orange[900]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[900],
+                              ),
                             ),
                             Text(
                               '• Mendapat sertifikat relawan',
-                              style: TextStyle(fontSize: 12, color: Colors.orange[900]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[900],
+                              ),
                             ),
                             Text(
                               '• Berkontribusi untuk kebaikan bersama',
-                              style: TextStyle(fontSize: 12, color: Colors.orange[900]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[900],
+                              ),
                             ),
                             Text(
                               '• Bertemu dengan relawan lainnya',
-                              style: TextStyle(fontSize: 12, color: Colors.orange[900]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[900],
+                              ),
                             ),
                           ],
                         ),
@@ -362,9 +362,9 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Submit Button
               SizedBox(
                 width: double.infinity,
@@ -377,14 +377,11 @@ class _VolunteerPageState extends State<VolunteerPage> {
                   ),
                   child: const Text(
                     'Daftar Sebagai Relawan',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
             ],
           ),

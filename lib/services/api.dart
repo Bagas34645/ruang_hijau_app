@@ -5,15 +5,18 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 
 class Api {
-  static const baseUrl = 'http://127.0.0.1:5000';
+  /// Get base URL untuk API calls
+  /// Automatically selects correct URL based on platform
+  static String get baseUrl => AppConfig.baseUrl;
 
   // --- Auth ---
   static Future<Map<String, dynamic>> register(
     Map<String, dynamic> body,
   ) async {
-    final url = Uri.parse('$baseUrl/auth/register');
+    final url = Uri.parse('$baseUrl/api/auth/register');
     final res = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -27,7 +30,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> login(Map<String, dynamic> body) async {
-    final url = Uri.parse('$baseUrl/auth/login');
+    final url = Uri.parse('$baseUrl/api/auth/login');
     final res = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -77,7 +80,7 @@ class Api {
 
   // --- Posts ---
   static Future<Map<String, dynamic>> fetchPosts() async {
-    final url = Uri.parse('$baseUrl/post/');
+    final url = Uri.parse('$baseUrl/api/posts/');
     final token = await _token();
     try {
       print('DEBUG fetchPosts: Requesting $url with token=$token');
@@ -105,7 +108,7 @@ class Api {
   static Future<Map<String, dynamic>> createPost(
     Map<String, dynamic> body,
   ) async {
-    final url = Uri.parse('$baseUrl/post/add');
+    final url = Uri.parse('$baseUrl/api/posts/add');
     final token = await _token();
     final res = await http.post(
       url,
@@ -123,7 +126,7 @@ class Api {
     Uint8List? imageBytes,
     String? filename,
   }) async {
-    final url = Uri.parse('$baseUrl/post/add');
+    final url = Uri.parse('$baseUrl/api/posts/add');
     final token = await _token();
     if (imageBytes != null && filename != null) {
       final request = http.MultipartRequest('POST', url);
@@ -253,6 +256,215 @@ class Api {
       'statusCode': res.statusCode,
       'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
     };
+  }
+
+  // --- Campaigns ---
+  static Future<Map<String, dynamic>> fetchCampaigns({
+    int limit = 20,
+    int page = 1,
+    String? category,
+  }) async {
+    final url = Uri.parse(
+      '$baseUrl/api/campaigns/?limit=$limit&page=$page${category != null ? '&category=$category' : ''}',
+    );
+    final token = await _token();
+    try {
+      print('DEBUG fetchCampaigns: Requesting $url');
+      final res = await http
+          .get(url, headers: _jsonHeaders(token))
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print('DEBUG fetchCampaigns: Request TIMEOUT after 10 seconds');
+              throw TimeoutException('Request timeout');
+            },
+          );
+      print('DEBUG fetchCampaigns: statusCode=${res.statusCode}');
+      print('DEBUG fetchCampaigns: body=${res.body}');
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG fetchCampaigns ERROR: $e');
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getCampaignDetail(int campaignId) async {
+    final url = Uri.parse('$baseUrl/api/campaigns/$campaignId');
+    final token = await _token();
+    try {
+      print('DEBUG getCampaignDetail: Requesting $url');
+      final res = await http
+          .get(url, headers: _jsonHeaders(token))
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print(
+                'DEBUG getCampaignDetail: Request TIMEOUT after 10 seconds',
+              );
+              throw TimeoutException('Request timeout');
+            },
+          );
+      print('DEBUG getCampaignDetail: statusCode=${res.statusCode}');
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG getCampaignDetail ERROR: $e');
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> createCampaignMultipart(
+    Map<String, dynamic> body, {
+    Uint8List? imageBytes,
+    String? filename,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/campaigns/');
+    final token = await _token();
+
+    print(
+      'DEBUG createCampaignMultipart: imageBytes=$imageBytes, filename=$filename',
+    );
+
+    if (imageBytes != null && filename != null) {
+      // Multipart upload from bytes (works on web & mobile)
+      final request = http.MultipartRequest('POST', url);
+      request.headers.addAll({'Accept': 'application/json'});
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      // Add form fields
+      request.fields.addAll(body.map((k, v) => MapEntry(k, v.toString())));
+
+      // Add image file
+      final mimeType = lookupMimeType(filename) ?? 'application/octet-stream';
+      final parts = mimeType.split('/');
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: filename,
+          contentType: MediaType(parts[0], parts[1]),
+        ),
+      );
+
+      print('DEBUG createCampaignMultipart: Sending multipart request');
+      final streamed = await request.send();
+      final res = await http.Response.fromStream(streamed);
+      print('DEBUG createCampaignMultipart: statusCode=${res.statusCode}');
+      print('DEBUG createCampaignMultipart: body=${res.body}');
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    }
+
+    // Fallback: JSON request without image
+    final res = await http.post(
+      url,
+      headers: _jsonHeaders(token),
+      body: jsonEncode(body),
+    );
+    return {
+      'statusCode': res.statusCode,
+      'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+    };
+  }
+
+  // Update campaign (with image)
+  static Future<Map<String, dynamic>> updateCampaignMultipart(
+    int campaignId,
+    Map<String, dynamic> body, {
+    Uint8List? imageBytes,
+    String? filename,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/campaigns/$campaignId');
+    final token = await _token();
+
+    print(
+      'DEBUG updateCampaignMultipart: imageBytes=$imageBytes, filename=$filename',
+    );
+
+    try {
+      // If image provided, use multipart
+      if (imageBytes != null && filename != null && imageBytes.isNotEmpty) {
+        final request = http.MultipartRequest('PUT', url)
+          ..headers.addAll(_jsonHeaders(token));
+
+        // Add form fields
+        body.forEach((key, value) {
+          request.fields[key] = value.toString();
+        });
+
+        // Detect MIME type
+        final mimeType = lookupMimeType(filename) ?? 'image/jpeg';
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            imageBytes,
+            filename: filename,
+            contentType: MediaType.parse(mimeType),
+          ),
+        );
+
+        print('DEBUG updateCampaignMultipart: Sending multipart request');
+        final res = await request.send();
+        final resBody = await res.stream.bytesToString();
+        print('DEBUG updateCampaignMultipart: statusCode=${res.statusCode}');
+        print('DEBUG updateCampaignMultipart: body=$resBody');
+        return {
+          'statusCode': res.statusCode,
+          'body': resBody.isNotEmpty ? jsonDecode(resBody) : null,
+        };
+      }
+
+      // Fallback: JSON request without image
+      final res = await http.put(
+        url,
+        headers: _jsonHeaders(token),
+        body: jsonEncode(body),
+      );
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG updateCampaignMultipart ERROR: $e');
+      rethrow;
+    }
+  }
+
+  // Delete campaign
+  static Future<Map<String, dynamic>> deleteCampaign(int campaignId) async {
+    final url = Uri.parse('$baseUrl/api/campaigns/$campaignId');
+    final token = await _token();
+
+    try {
+      print('DEBUG deleteCampaign: Requesting $url');
+      final res = await http
+          .delete(url, headers: _jsonHeaders(token))
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print('DEBUG deleteCampaign: Request TIMEOUT after 10 seconds');
+              throw TimeoutException('Request timeout');
+            },
+          );
+      print('DEBUG deleteCampaign: statusCode=${res.statusCode}');
+      print('DEBUG deleteCampaign: body=${res.body}');
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG deleteCampaign ERROR: $e');
+      rethrow;
+    }
   }
 
   // --- Comments ---

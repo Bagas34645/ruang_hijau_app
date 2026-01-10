@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/api.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,47 +22,111 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // ===== LOGIKA LOGIN (TIDAK DIUBAH) =====
-  void _login() async {
-    setState(() => _loading = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+  // ===== LOGIKA LOGIN DENGAN VALIDASI =====
+  Future<void> _login() async {
+    // Validasi input
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
 
-    final res = await Api.login({
-      'email': _emailCtrl.text,
-      'password': _passwordCtrl.text,
-    });
-
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (res['statusCode'] == 200 && res['user'] != null) {
-      final body = res['body'];
-      messenger.showSnackBar(
-        SnackBar(content: Text(body?['message'] ?? 'Login berhasil')),
-      );
-      navigator.pushNamedAndRemoveUntil('/home', (route) => false);
-    } else {
-      final body = res['body'];
-      String msg = body?['message'] ?? 'Login gagal';
-
-      if (res['statusCode'] == 200 && res['user'] == null) {
-        final prefs = await SharedPreferences.getInstance();
-        final localUser = prefs.getString('user');
-        if (localUser != null && localUser.isNotEmpty) {
-          messenger.showSnackBar(
-            SnackBar(content: Text(body?['message'] ?? 'Login berhasil')),
-          );
-          navigator.pushNamedAndRemoveUntil('/home', (route) => false);
-          return;
-        }
-
-        msg =
-            'Login berhasil, tapi token tidak diterima dari server. Coba lagi atau hubungi administrator.';
-      }
-
-      messenger.showSnackBar(SnackBar(content: Text(msg)));
+    if (email.isEmpty) {
+      _showSnackBar('Email tidak boleh kosong', isError: true);
+      return;
     }
+
+    if (!_isValidEmail(email)) {
+      _showSnackBar('Format email tidak valid', isError: true);
+      return;
+    }
+
+    if (password.isEmpty) {
+      _showSnackBar('Password tidak boleh kosong', isError: true);
+      return;
+    }
+
+    if (password.length < 6) {
+      _showSnackBar('Password minimal 6 karakter', isError: true);
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => _loading = true);
+
+    try {
+      print('DEBUG: Attempting login with email: $email');
+
+      final res = await Api.login({'email': email, 'password': password});
+
+      if (!mounted) return;
+
+      print('DEBUG: Login response statusCode: ${res['statusCode']}');
+      print('DEBUG: Login response body: ${res['body']}');
+      print('DEBUG: Login response user: ${res['user']}');
+
+      final body = res['body'];
+
+      // Status 200 = Success
+      if (res['statusCode'] == 200 && res['user'] != null) {
+        _showSnackBar('Login berhasil!', isError: false);
+
+        // Clear form
+        _emailCtrl.clear();
+        _passwordCtrl.clear();
+
+        // Navigate to home
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      }
+      // Status 401 = Invalid email/password
+      else if (res['statusCode'] == 401) {
+        setState(() => _loading = false);
+        final message = body?['message'] ?? 'Email atau password salah';
+        _showSnackBar(message, isError: true);
+      }
+      // Status 400 = Bad request (missing fields, etc)
+      else if (res['statusCode'] == 400) {
+        setState(() => _loading = false);
+        final message = body?['message'] ?? 'Request tidak valid';
+        _showSnackBar(message, isError: true);
+      }
+      // Status 500 = Server error
+      else if (res['statusCode'] == 500) {
+        setState(() => _loading = false);
+        final message = body?['message'] ?? 'Terjadi kesalahan server';
+        _showSnackBar(message, isError: true);
+      }
+      // Other status codes
+      else {
+        setState(() => _loading = false);
+        final message =
+            body?['message'] ?? 'Login gagal (Status: ${res['statusCode']})';
+        _showSnackBar(message, isError: true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      print('DEBUG: Login error: $e');
+      _showSnackBar('Terjadi kesalahan: $e', isError: true);
+    }
+  }
+
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    return emailRegex.hasMatch(email);
+  }
+
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
+        backgroundColor: isError ? Colors.red[700] : Colors.green[700],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: Duration(seconds: isError ? 4 : 2),
+      ),
+    );
   }
 
   // ===== UI =====

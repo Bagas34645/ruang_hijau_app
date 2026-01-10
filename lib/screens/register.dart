@@ -14,6 +14,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
 
   bool _loading = false;
   bool _obscurePassword = true;
@@ -25,51 +26,83 @@ class _RegisterPageState extends State<RegisterPage> {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      _showSnackBar('Mohon periksa kembali form Anda', isError: true);
+      return;
+    }
 
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
 
     try {
+      print(
+        'DEBUG: Attempting registration with email: ${_emailCtrl.text.trim()}',
+      );
+
       final res = await Api.register({
         'name': _nameCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
         'password': _passwordCtrl.text,
+        'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       });
 
       if (!mounted) return;
-      setState(() => _loading = false);
+
+      print('DEBUG: Registration response statusCode: ${res['statusCode']}');
+      print('DEBUG: Registration response body: ${res['body']}');
 
       final body = res['body'];
-      final message = body?['message'] ?? 'Terjadi kesalahan';
+      final message = body?['message'] ?? 'Terjadi kesalahan registrasi';
 
-      if (res['statusCode'] == 201 || res['statusCode'] == 200) {
+      if (res['statusCode'] == 201) {
+        // Success
         _showSnackBar(message, isError: false);
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(seconds: 1));
         if (!mounted) return;
+
+        // Clear form before navigation
+        _nameCtrl.clear();
+        _emailCtrl.clear();
+        _passwordCtrl.clear();
+        _confirmPasswordCtrl.clear();
+        _phoneCtrl.clear();
+
+        // Navigate back to login
         Navigator.pop(context);
-      } else {
+      } else if (res['statusCode'] == 400) {
+        // Validation error from backend
+        setState(() => _loading = false);
         _showSnackBar(message, isError: true);
+      } else {
+        // Other errors
+        setState(() => _loading = false);
+        _showSnackBar(
+          message ?? 'Terjadi kesalahan. Status: ${res['statusCode']}',
+          isError: true,
+        );
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _showSnackBar('Terjadi kesalahan. Silakan coba lagi.', isError: true);
+      print('DEBUG: Registration error: $e');
+      _showSnackBar('Terjadi kesalahan: $e', isError: true);
     }
   }
 
   void _showSnackBar(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
         backgroundColor: isError ? Colors.red[700] : Colors.green[700],
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
+        duration: Duration(seconds: isError ? 4 : 2),
       ),
     );
   }
@@ -81,6 +114,9 @@ class _RegisterPageState extends State<RegisterPage> {
     if (value.trim().length < 3) {
       return 'Nama minimal 3 karakter';
     }
+    if (value.trim().length > 100) {
+      return 'Nama maksimal 100 karakter';
+    }
     return null;
   }
 
@@ -88,9 +124,11 @@ class _RegisterPageState extends State<RegisterPage> {
     if (value == null || value.trim().isEmpty) {
       return 'Email tidak boleh kosong';
     }
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
     if (!emailRegex.hasMatch(value.trim())) {
-      return 'Format email tidak valid';
+      return 'Format email tidak valid (contoh: user@example.com)';
     }
     return null;
   }
@@ -102,6 +140,9 @@ class _RegisterPageState extends State<RegisterPage> {
     if (value.length < 6) {
       return 'Password minimal 6 karakter';
     }
+    if (value.length > 50) {
+      return 'Password maksimal 50 karakter';
+    }
     return null;
   }
 
@@ -111,6 +152,23 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     if (value != _passwordCtrl.text) {
       return 'Password tidak cocok';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value != null && value.trim().isNotEmpty) {
+      // Optional field, but if filled must be valid
+      if (value.trim().length < 7) {
+        return 'Nomor telepon minimal 7 digit';
+      }
+      if (value.trim().length > 20) {
+        return 'Nomor telepon maksimal 20 karakter';
+      }
+      // Allow only digits, spaces, hyphens, plus, and parentheses
+      if (!RegExp(r'^[0-9\-\+\(\)\s]{7,20}$').hasMatch(value.trim())) {
+        return 'Format nomor telepon tidak valid';
+      }
     }
     return null;
   }
@@ -144,6 +202,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     const SizedBox(height: 16),
                     _buildEmailField(),
                     const SizedBox(height: 16),
+                    _buildPhoneField(),
+                    const SizedBox(height: 16),
                     _buildPasswordField(),
                     const SizedBox(height: 16),
                     _buildConfirmPasswordField(),
@@ -151,6 +211,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     _buildRegisterButton(),
                     const SizedBox(height: 16),
                     _buildLoginRedirect(),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -187,8 +248,9 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Daftar untuk bergabung dengan kami',
-          style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+          'Daftar untuk bergabung dengan komunitas kami',
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -198,27 +260,31 @@ class _RegisterPageState extends State<RegisterPage> {
     return TextFormField(
       controller: _nameCtrl,
       validator: _validateName,
+      textInputAction: TextInputAction.next,
       keyboardType: TextInputType.name,
       textCapitalization: TextCapitalization.words,
       decoration: InputDecoration(
         labelText: 'Nama Lengkap',
-        hintText: 'Masukkan nama lengkap',
-        prefixIcon: Icon(Icons.person_outline, color: Colors.green[600]),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
+        hintText: 'Masukkan nama lengkap Anda',
+        prefixIcon: Icon(Icons.person, color: Colors.green[700]),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.green.shade600, width: 2),
+          borderSide: BorderSide(color: Colors.green[700]!, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.red),
         ),
-        filled: true,
-        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }
@@ -227,26 +293,62 @@ class _RegisterPageState extends State<RegisterPage> {
     return TextFormField(
       controller: _emailCtrl,
       validator: _validateEmail,
+      textInputAction: TextInputAction.next,
       keyboardType: TextInputType.emailAddress,
       decoration: InputDecoration(
         labelText: 'Email',
-        hintText: 'nama@email.com',
-        prefixIcon: Icon(Icons.email_outlined, color: Colors.green[600]),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
+        hintText: 'Masukkan email Anda',
+        prefixIcon: Icon(Icons.email, color: Colors.green[700]),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.green[600]!, width: 2),
+          borderSide: BorderSide(color: Colors.green[700]!, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.red),
         ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneField() {
+    return TextFormField(
+      controller: _phoneCtrl,
+      validator: _validatePhone,
+      textInputAction: TextInputAction.next,
+      keyboardType: TextInputType.phone,
+      decoration: InputDecoration(
+        labelText: 'Nomor Telepon (Opsional)',
+        hintText: 'Masukkan nomor telepon',
+        prefixIcon: Icon(Icons.phone, color: Colors.green[700]),
         filled: true,
         fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.green[700]!, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }
@@ -255,11 +357,12 @@ class _RegisterPageState extends State<RegisterPage> {
     return TextFormField(
       controller: _passwordCtrl,
       validator: _validatePassword,
+      textInputAction: TextInputAction.next,
       obscureText: _obscurePassword,
       decoration: InputDecoration(
         labelText: 'Password',
         hintText: 'Minimal 6 karakter',
-        prefixIcon: Icon(Icons.lock_outline, color: Colors.green[600]),
+        prefixIcon: Icon(Icons.lock, color: Colors.green[700]),
         suffixIcon: IconButton(
           icon: Icon(
             _obscurePassword
@@ -269,21 +372,24 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.green[600]!, width: 2),
+          borderSide: BorderSide(color: Colors.green[700]!, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.red),
         ),
-        filled: true,
-        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }
@@ -296,7 +402,7 @@ class _RegisterPageState extends State<RegisterPage> {
       decoration: InputDecoration(
         labelText: 'Konfirmasi Password',
         hintText: 'Masukkan ulang password',
-        prefixIcon: Icon(Icons.lock_outline, color: Colors.green[600]),
+        prefixIcon: Icon(Icons.lock, color: Colors.green[700]),
         suffixIcon: IconButton(
           icon: Icon(
             _obscureConfirmPassword
@@ -308,21 +414,24 @@ class _RegisterPageState extends State<RegisterPage> {
             () => _obscureConfirmPassword = !_obscureConfirmPassword,
           ),
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.green[600]!, width: 2),
+          borderSide: BorderSide(color: Colors.green[700]!, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Colors.red),
         ),
-        filled: true,
-        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }

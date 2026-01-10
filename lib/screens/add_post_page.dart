@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api.dart';
 
 class AddPostPage extends StatefulWidget {
@@ -15,6 +16,19 @@ class _AddPostPageState extends State<AddPostPage> {
   Uint8List? _imageBytes;
   String? _imageName;
   bool _saving = false;
+  int? _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('user_id');
+    setState(() => _userId = userId);
+  }
 
   @override
   void dispose() {
@@ -35,66 +49,126 @@ class _AddPostPageState extends State<AddPostPage> {
   }
 
   Future<void> _submit() async {
-    if (_imageBytes == null && _captionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Tambahkan gambar atau caption'),
-          backgroundColor: const Color(0xFFD32F2F),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+    // Validate inputs
+    if (_userId == null) {
+      _showSnackBar(
+        'User tidak ditemukan. Silakan login kembali.',
+        isError: true,
       );
       return;
     }
 
+    final caption = _captionController.text.trim();
+
+    // Check that either caption or image exists
+    if (caption.isEmpty && _imageBytes == null) {
+      _showSnackBar(
+        'Tambahkan gambar atau caption untuk membuat post',
+        isError: true,
+      );
+      return;
+    }
+
+    // Validate caption length if provided
+    if (caption.isNotEmpty && caption.length > 2000) {
+      _showSnackBar('Caption maksimal 2000 karakter', isError: true);
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
     setState(() => _saving = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
 
-    Map<String, dynamic> res;
-    if (_imageBytes != null && _imageName != null) {
-      res = await Api.createPostMultipart(
-        {'user_id': 1, 'content': _captionController.text},
-        imageBytes: _imageBytes,
-        filename: _imageName,
-      );
-    } else {
-      res = await Api.createPost({
-        'user_id': 1,
-        'content': _captionController.text,
-        'image': null,
-      });
+    try {
+      print('DEBUG: Creating post with user_id: $_userId');
+
+      Map<String, dynamic> res;
+      if (_imageBytes != null && _imageName != null) {
+        print('DEBUG: Uploading post with image');
+        print('DEBUG: Image name: $_imageName');
+        print('DEBUG: Image size: ${_imageBytes?.length} bytes');
+        res = await Api.createPostMultipart(
+          {
+            'user_id': _userId.toString(),
+            'text': caption.isEmpty ? '[Post tanpa caption]' : caption,
+          },
+          imageBytes: _imageBytes,
+          filename: _imageName,
+        );
+      } else {
+        print('DEBUG: Creating post with caption only');
+        res = await Api.createPost({
+          'user_id': _userId.toString(),
+          'text': caption.isEmpty ? '[Post tanpa gambar]' : caption,
+        });
+      }
+
+      if (!mounted) return;
+
+      print('DEBUG: Create post response statusCode: ${res['statusCode']}');
+      print('DEBUG: Create post response body: ${res['body']}');
+
+      final body = res['body'];
+      final message = body?['message'] ?? 'Terjadi kesalahan saat membuat post';
+
+      // Status 201 = Created
+      if (res['statusCode'] == 201) {
+        setState(() => _saving = false);
+        _showSnackBar('Post berhasil dibuat!', isError: false);
+
+        // Clear form
+        _captionController.clear();
+        _imageBytes = null;
+        _imageName = null;
+
+        // Navigate back with success indicator
+        if (!mounted) return;
+        Navigator.pop(context, true);
+      }
+      // Status 400 = Bad request (validation error)
+      else if (res['statusCode'] == 400) {
+        setState(() => _saving = false);
+        _showSnackBar(message, isError: true);
+      }
+      // Status 401 = Unauthorized
+      else if (res['statusCode'] == 401) {
+        setState(() => _saving = false);
+        _showSnackBar(
+          'Anda belum login. Silakan login terlebih dahulu.',
+          isError: true,
+        );
+      }
+      // Status 500 = Server error
+      else if (res['statusCode'] == 500) {
+        setState(() => _saving = false);
+        _showSnackBar(message, isError: true);
+      }
+      // Other status codes
+      else {
+        setState(() => _saving = false);
+        _showSnackBar(
+          'Error: $message (Status ${res['statusCode']})',
+          isError: true,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      print('DEBUG: Create post error: $e');
+      _showSnackBar('Terjadi kesalahan: $e', isError: true);
     }
+  }
 
-    if (!mounted) return;
-    setState(() => _saving = false);
-
-    if (res['statusCode'] == 200) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: const Text('Post berhasil ditambahkan!'),
-          backgroundColor: const Color(0xFF43A047),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      navigator.pop(true);
-    } else {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(res['body']?['message'] ?? 'Gagal menambahkan post'),
-          backgroundColor: const Color(0xFFD32F2F),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-    }
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis),
+        backgroundColor: isError ? Colors.red[700] : Colors.green[700],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: Duration(seconds: isError ? 4 : 2),
+      ),
+    );
   }
 
   @override
@@ -265,6 +339,8 @@ class _AddPostPageState extends State<AddPostPage> {
   }
 
   Widget _buildCaptionSection() {
+    final captionLength = _captionController.text.length;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -306,12 +382,29 @@ class _AddPostPageState extends State<AddPostPage> {
           TextField(
             controller: _captionController,
             maxLines: 5,
+            maxLength: 2000,
+            onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: 15, height: 1.5),
             decoration: const InputDecoration(
               hintText: 'Ceritakan sesuatu tentang foto ini...',
               hintStyle: TextStyle(color: Color(0xFF9E9E9E)),
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
+              counterText: '',
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Text(
+              '$captionLength/2000',
+              style: TextStyle(
+                color: captionLength > 1800
+                    ? Colors.orange
+                    : captionLength > 1900
+                    ? Colors.red
+                    : Colors.grey[600],
+                fontSize: 12,
+              ),
             ),
           ),
           const SizedBox(height: 12),

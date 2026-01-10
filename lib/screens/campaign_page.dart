@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/api.dart';
+import '../config/app_config.dart';
 import 'create_campaign_page.dart';
+import 'edit_campaign_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CampaignPage extends StatefulWidget {
   const CampaignPage({super.key});
@@ -10,55 +14,79 @@ class CampaignPage extends StatefulWidget {
 
 class _CampaignPageState extends State<CampaignPage> {
   List<Map<String, dynamic>> campaigns = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  int _currentPage = 1;
+  int _totalPages = 1;
+  String? _selectedCategory;
+  final List<String> categories = [
+    'Semua Kategori',
+    'Lingkungan',
+    'Pendidikan',
+    'Kesehatan',
+    'Kemanusiaan',
+    'Bencana Alam',
+    'Sosial',
+    'Infrastruktur',
+    'Lainnya',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _loadDummyCampaigns();
+    _loadCampaigns();
   }
 
-  void _loadDummyCampaigns() {
-    campaigns = [
-      {
-        'title': 'Reboisasi Hutan Mangrove',
-        'description':
-            'Mari bersama-sama menanam 10.000 pohon mangrove untuk menyelamatkan ekosistem pesisir',
-        'target': 50000000,
-        'collected': 35000000,
-        'daysLeft': 15,
-        'volunteers': 45,
-        'category': 'Lingkungan',
-        'location': 'Pantai Indah, Jakarta',
-        'contact': '081234567890',
-        'isNew': false,
-      },
-      {
-        'title': 'Bantuan Korban Banjir',
-        'description':
-            'Pengumpulan dana untuk membantu korban banjir mendapatkan tempat tinggal sementara',
-        'target': 30000000,
-        'collected': 18000000,
-        'daysLeft': 8,
-        'volunteers': 78,
-        'category': 'Bencana Alam',
-        'location': 'Karawang, Jawa Barat',
-        'contact': '082345678901',
-        'isNew': false,
-      },
-      {
-        'title': 'Beasiswa Anak Prasejahtera',
-        'description':
-            'Program beasiswa untuk 100 anak prasejahtera agar bisa melanjutkan pendidikan',
-        'target': 100000000,
-        'collected': 45000000,
-        'daysLeft': 30,
-        'volunteers': 23,
-        'category': 'Pendidikan',
-        'location': 'Bandung, Jawa Barat',
-        'contact': '083456789012',
-        'isNew': false,
-      },
-    ];
+  Future<void> _loadCampaigns({int page = 1}) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      print(
+        'DEBUG: Loading campaigns from API, page=$page, category=$_selectedCategory',
+      );
+      final response = await Api.fetchCampaigns(
+        page: page,
+        category:
+            _selectedCategory == 'Semua Kategori' || _selectedCategory == null
+            ? null
+            : _selectedCategory,
+      );
+
+      print('DEBUG: API response statusCode=${response['statusCode']}');
+      print('DEBUG: API response body=${response['body']}');
+
+      if (response['statusCode'] == 200) {
+        final body = response['body'];
+        if (body != null && body is Map && body['data'] != null) {
+          setState(() {
+            campaigns = List<Map<String, dynamic>>.from(body['data'] ?? []);
+            _currentPage = body['pagination']?['page'] ?? 1;
+            _totalPages = body['pagination']?['pages'] ?? 1;
+            _isLoading = false;
+          });
+          print('DEBUG: Loaded ${campaigns.length} campaigns');
+        } else {
+          setState(() {
+            _errorMessage = 'Data format tidak valid';
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Gagal memuat kampanye: ${response['statusCode']}';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Error loading campaigns: $e');
+      setState(() {
+        _errorMessage = 'Error: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   String formatCurrency(int amount) {
@@ -72,6 +100,161 @@ class _CampaignPageState extends State<CampaignPage> {
     return collected / target;
   }
 
+  Future<void> _openEditCampaign(Map<String, dynamic> campaign) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditCampaignPage(campaign: campaign),
+      ),
+    );
+
+    if (result != null &&
+        result is Map<String, dynamic> &&
+        result['success'] == true) {
+      _loadCampaigns();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Kampanye berhasil diperbarui!'),
+              ],
+            ),
+            backgroundColor: const Color(0xFF43A047),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteCampaign(int campaignId) async {
+    // Confirm dialog
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Kampanye'),
+        content: const Text(
+          'Apakah Anda yakin ingin menghapus kampanye ini? Tindakan ini tidak dapat dibatalkan.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      // Show loading
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Menghapus kampanye...'),
+              ],
+            ),
+            backgroundColor: Colors.grey[800],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      try {
+        final response = await Api.deleteCampaign(campaignId);
+        print('DEBUG: Delete response statusCode=${response['statusCode']}');
+
+        if (response['statusCode'] == 200 || response['statusCode'] == 204) {
+          // Remove from list
+          setState(() {
+            campaigns.removeWhere((c) => c['id'] == campaignId);
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('Kampanye berhasil dihapus!'),
+                  ],
+                ),
+                backgroundColor: Colors.red[600],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            );
+          }
+        } else {
+          final errorMsg =
+              response['body']?['message'] ?? 'Gagal menghapus kampanye';
+          if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(errorMsg)),
+                  ],
+                ),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        print('DEBUG: Error deleting campaign: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('Error: $e')),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  // --- Campaign Detail & Stats ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,14 +282,74 @@ class _CampaignPageState extends State<CampaignPage> {
           ),
         ],
       ),
-      body: campaigns.isEmpty
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF43A047)),
+              ),
+            )
+          : _errorMessage != null
+          ? _buildErrorState()
+          : campaigns.isEmpty
           ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: campaigns.length,
-              itemBuilder: (context, index) {
-                return _buildCampaignCard(campaigns[index]);
-              },
+          : Column(
+              children: [
+                // Category filter
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                    height: 50,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: categories.length,
+                      itemBuilder: (context, index) {
+                        final category = categories[index];
+                        final isSelected =
+                            (category == 'Semua Kategori' &&
+                                _selectedCategory == null) ||
+                            category == _selectedCategory;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(category),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                if (category == 'Semua Kategori') {
+                                  _selectedCategory = null;
+                                } else {
+                                  _selectedCategory = selected
+                                      ? category
+                                      : null;
+                                }
+                                _currentPage = 1;
+                              });
+                              _loadCampaigns();
+                            },
+                            selectedColor: const Color(0xFF43A047),
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                // Campaigns list
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => _loadCampaigns(page: _currentPage),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: campaigns.length,
+                      itemBuilder: (context, index) {
+                        return _buildCampaignCard(campaigns[index]);
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -115,10 +358,10 @@ class _CampaignPageState extends State<CampaignPage> {
             MaterialPageRoute(builder: (context) => const CreateCampaignPage()),
           );
 
-          if (result != null && result is Map<String, dynamic>) {
-            setState(() {
-              campaigns.insert(0, result);
-            });
+          if (result != null &&
+              result is Map<String, dynamic> &&
+              result['success'] == true) {
+            _loadCampaigns();
 
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -126,7 +369,7 @@ class _CampaignPageState extends State<CampaignPage> {
                   children: const [
                     Icon(Icons.check_circle, color: Colors.white),
                     SizedBox(width: 12),
-                    Text('Kampanye berhasil ditambahkan!'),
+                    Text('Kampanye berhasil dibuat!'),
                   ],
                 ),
                 backgroundColor: const Color(0xFF43A047),
@@ -143,6 +386,50 @@ class _CampaignPageState extends State<CampaignPage> {
         label: const Text(
           'Buat Kampanye',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.red[200]!),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red[700]),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal Memuat Kampanye',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.red[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'Terjadi kesalahan',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadCampaigns(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF43A047),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Coba Lagi'),
+            ),
+          ],
         ),
       ),
     );
@@ -211,9 +498,49 @@ class _CampaignPageState extends State<CampaignPage> {
     );
   }
 
+  Widget _buildPlaceholderImage() {
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFF66BB6A), const Color(0xFF43A047)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.campaign, size: 64, color: Colors.white70),
+      ),
+    );
+  }
+
   Widget _buildCampaignCard(Map<String, dynamic> campaign) {
-    final progress = getProgress(campaign['collected'], campaign['target']);
+    // Safe conversion helper - handles String, double, int, or null
+    int _safeToInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) {
+        final parsed = double.tryParse(value);
+        return parsed?.toInt() ?? 0;
+      }
+      return 0;
+    }
+
+    final currentAmount = _safeToInt(campaign['current_amount']);
+    final targetAmount = _safeToInt(campaign['target_amount']);
+    final progress = targetAmount > 0
+        ? getProgress(currentAmount, targetAmount)
+        : 0.0;
     final percentage = (progress * 100).toInt();
+    final daysLeft = _safeToInt(campaign['duration_days']);
+    final donorCount = _safeToInt(campaign['donor_count']);
+    final volunteerCount = _safeToInt(campaign['volunteer_count']);
+    final imageFilename = campaign['image'] as String?;
+    final imageUrl = imageFilename != null && imageFilename.isNotEmpty
+        ? AppConfig.getImageUrl(imageFilename)
+        : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -238,54 +565,33 @@ class _CampaignPageState extends State<CampaignPage> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
-                child: campaign['imageWidget'] != null
-                    ? campaign['imageWidget']
-                    : Container(
+                child: imageUrl != null
+                    ? Image.network(
+                        imageUrl,
                         height: 200,
                         width: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF66BB6A),
-                              const Color(0xFF43A047),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.campaign,
-                            size: 64,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          print('DEBUG: Error loading campaign image: $error');
+                          return _buildPlaceholderImage();
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 200,
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF43A047),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : _buildPlaceholderImage(),
               ),
-              // New Badge
-              if (campaign['isNew'] == true)
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'BARU',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
               // Category Badge
               Positioned(
                 top: 12,
@@ -305,7 +611,7 @@ class _CampaignPageState extends State<CampaignPage> {
                       const Icon(Icons.category, color: Colors.white, size: 14),
                       const SizedBox(width: 4),
                       Text(
-                        campaign['category'],
+                        campaign['category'] ?? 'Lainnya',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -313,6 +619,46 @@ class _CampaignPageState extends State<CampaignPage> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+              // Action Menu (Edit & Delete)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      _openEditCampaign(campaign);
+                    } else if (value == 'delete') {
+                      _deleteCampaign(campaign['id']);
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: Colors.blue, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('Hapus'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
@@ -359,7 +705,7 @@ class _CampaignPageState extends State<CampaignPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Rp ${formatCurrency(campaign['collected'])}',
+                          'Rp ${formatCurrency(currentAmount)}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -390,7 +736,7 @@ class _CampaignPageState extends State<CampaignPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'dari Rp ${formatCurrency(campaign['target'])}',
+                      'dari Rp ${formatCurrency(targetAmount)}',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
@@ -401,17 +747,9 @@ class _CampaignPageState extends State<CampaignPage> {
                 // Stats Row
                 Row(
                   children: [
-                    _buildStat(
-                      Icons.schedule,
-                      '${campaign['daysLeft']} hari',
-                      'Tersisa',
-                    ),
+                    _buildStat(Icons.schedule, '$daysLeft hari', 'Tersisa'),
                     const SizedBox(width: 16),
-                    _buildStat(
-                      Icons.people,
-                      '${campaign['volunteers']}',
-                      'Relawan',
-                    ),
+                    _buildStat(Icons.people, '$volunteerCount', 'Relawan'),
                     const Spacer(),
                     // Donate Button
                     ElevatedButton(

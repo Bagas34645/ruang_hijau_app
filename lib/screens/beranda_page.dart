@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/api.dart';
+import '../config/app_config.dart';
 import 'profile_page.dart';
 import 'add_post_page.dart';
 import 'notifications_page.dart';
 import 'campaign_page.dart';
+import 'chatbot_page.dart';
 
 class BerandaPage extends StatefulWidget {
   const BerandaPage({super.key});
@@ -38,27 +40,48 @@ class _BerandaPageState extends State<BerandaPage>
   Future<void> _loadPosts() async {
     setState(() => _loading = true);
     try {
+      print('DEBUG: Loading posts...');
+      print('DEBUG: BaseUrl: ${AppConfig.baseUrl}');
       final res = await Api.fetchPosts();
 
       if (!mounted) return;
 
+      print('DEBUG: Response statusCode: ${res['statusCode']}');
+      print('DEBUG: Response body: ${res['body']}');
+      print('DEBUG: Base URL: ${AppConfig.baseUrl}');
+
       if (res['statusCode'] == 200 && res['body'] != null) {
-        final data = res['body'] as List<dynamic>;
+        final body = res['body'] as Map<String, dynamic>;
+        final data = body['data'] as List<dynamic>? ?? [];
+
+        print('DEBUG: Posts count: ${data.length}');
+
         posts = data.map((e) {
+          final imageFilename = e['image'];
+          final imageUrl = AppConfig.getImageUrl(imageFilename);
+          print('DEBUG: Post ${e['id']} image: $imageFilename -> $imageUrl');
+
           return {
             'id': e['id'],
-            'username': 'User ${e['user_id'] ?? 'unknown'}',
-            'imageUrl': e['image'] != null
-                ? 'http://127.0.0.1:5000/uploads/${e['image']}'
-                : 'https://picsum.photos/400/300',
+            'username': e['author_name'] ?? 'User ${e['user_id'] ?? 'unknown'}',
+            'imageUrl': imageUrl,
             'caption': e['text'] ?? '',
             'isLiked': false,
-            'likesCount': (e['user_id'] ?? 0) * 7 % 100 + 12,
-            'commentsCount': (e['user_id'] ?? 0) * 3 % 20 + 2,
+            'likesCount': e['likes'] ?? 0,
+            'commentsCount': e['comment_count'] ?? 0,
           };
         }).toList();
+
+        print('DEBUG: Posts loaded successfully. Total: ${posts.length}');
+      } else {
+        print(
+          'DEBUG: No posts or error in response. StatusCode: ${res['statusCode']}',
+        );
+        posts = [];
       }
     } catch (e) {
+      print('DEBUG: Error loading posts: $e');
+      print('DEBUG: Stack trace: ${StackTrace.current}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -218,6 +241,27 @@ class _BerandaPageState extends State<BerandaPage>
           ],
         ),
         actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.smart_toy_outlined,
+                color: Color(0xFF2E7D32),
+                size: 26,
+              ),
+              tooltip: 'AI Assistant',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatbotPage()),
+                );
+              },
+            ),
+          ),
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
@@ -828,6 +872,35 @@ class _BerandaPageState extends State<BerandaPage>
                                     progress.expectedTotalBytes!
                               : null,
                         ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    print(
+                      'DEBUG: Image load error for ${post['imageUrl']}: $error',
+                    );
+                    print('DEBUG: Stack trace: $stackTrace');
+                    return Container(
+                      height: 280,
+                      color: Colors.grey[300],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 48,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Gambar gagal dimuat',
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
