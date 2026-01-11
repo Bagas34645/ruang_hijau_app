@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({Key? key}) : super(key: key);
@@ -27,7 +28,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
       _addMessage(
         ChatMessage(
           text:
-              'Halo! Saya EcoBot asisten RuangHijau. Ada yang bisa saya bantu?',
+              'Halo! Saya EcoBot asisten RuangHijau. Ada yang bisa saya bantu tentang lingkungan dan kelestarian alam?',
           isUser: false,
           timestamp: DateTime.now(),
         ),
@@ -73,7 +74,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
       _addMessage(
         ChatMessage(
-          text: 'Maaf, terjadi kesalahan. Silakan coba lagi.',
+          text: 'Maaf, terjadi kesalahan. Silakan coba lagi nanti.',
           isUser: false,
           timestamp: DateTime.now(),
         ),
@@ -82,97 +83,56 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   // ============================================
-  // INTEGRATE YOUR CHATBOT API HERE
+  // CHATBOT RAG API INTEGRATION
   // ============================================
   Future<String> _callChatbotAPI(String userMessage) async {
-    // TODO: Replace with your chatbot API endpoint
+    final url = Uri.parse('${AppConfig.baseUrl}/api/chatbot/chat');
+    try {
+      print('🚀 [Chatbot] Sending request to: $url');
 
-    // Example 1: Your own Flask/FastAPI backend
-    /*
-    final response = await http.post(
-      Uri.parse('http://YOUR_API_URL/chat'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'message': userMessage,
-        'user_id': 'user123', // Optional
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['response'];
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'message': userMessage,
+              'user_id': 'flutter_user',
+            }),
+          )
+          .timeout(
+            const Duration(
+              seconds: 300,
+            ), // Meningkatkan timeout ke 5 menit untuk LLM lokal
+            onTimeout: () {
+              throw Exception(
+                'Request timeout - server memproses terlalu lama',
+              );
+            },
+          );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data['response'] ?? 'Tidak ada respons dari server.';
+        } else {
+          return data['error'] ?? 'Terjadi kesalahan pada server.';
+        }
+      } else if (response.statusCode == 503) {
+        return 'Layanan chatbot sedang loading model atau tidak tersedia. Mohon tunggu sebentar dan coba lagi.';
+      } else {
+        return 'Server error (${response.statusCode}). Silakan coba lagi.';
+      }
+    } catch (e) {
+      print('Chatbot API Error: $e');
+      if (e.toString().contains('timeout')) {
+        return 'Waktu habis. Proses AI memakan waktu lama (biasanya saat pertama kali). Silakan coba kirim pesan lagi.';
+      } else if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused') ||
+          e.toString().contains('XMLHttpRequest')) {
+        return 'Gagal terhubung ke server ($url). \n\nPastikan:\n1. Server Flask berjalan (run_backend.bat)\n2. Konfigurasi IP di app_config.dart benar (jika pakai HP fisik, jangan pakai 10.0.2.2).';
+      }
+      return 'Maaf, terjadi kesalahan: ${e.toString()}';
     }
-    */
-
-    // Example 2: OpenAI GPT
-    /*
-    final response = await http.post(
-      Uri.parse('https://api.openai.com/v1/chat/completions'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer YOUR_OPENAI_API_KEY',
-      },
-      body: json.encode({
-        'model': 'gpt-3.5-turbo',
-        'messages': [
-          {'role': 'user', 'content': userMessage}
-        ],
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['choices'][0]['message']['content'];
-    }
-    */
-
-    // Example 3: Anthropic Claude
-    /*
-    final response = await http.post(
-      Uri.parse('https://api.anthropic.com/v1/messages'),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': 'YOUR_ANTHROPIC_API_KEY',
-        'anthropic-version': '2023-06-01',
-      },
-      body: json.encode({
-        'model': 'claude-3-haiku-20240307',
-        'max_tokens': 1024,
-        'messages': [
-          {'role': 'user', 'content': userMessage}
-        ],
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['content'][0]['text'];
-    }
-    */
-
-    // Example 4: Hugging Face
-    /*
-    final response = await http.post(
-      Uri.parse('https://api-inference.huggingface.co/models/YOUR_MODEL'),
-      headers: {
-        'Authorization': 'Bearer YOUR_HF_TOKEN',
-        'Content-Type': 'application/json',
-      },
-      body: json.encode({
-        'inputs': userMessage,
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data[0]['generated_text'];
-    }
-    */
-
-    // Temporary mock response for demo
-    await Future.delayed(const Duration(seconds: 1));
-    return 'Terima kasih atas pesannya! Ini adalah response dari chatbot Anda. '
-        'Silakan integrasikan dengan API chatbot Anda di fungsi _callChatbotAPI().';
   }
 
   void _scrollToBottom() {
