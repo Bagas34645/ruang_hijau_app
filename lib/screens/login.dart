@@ -245,7 +245,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // ===== INI YANG DIPERBAIKI =====
   Widget _buildLoginButton() {
     return ElevatedButton(
       onPressed: () {

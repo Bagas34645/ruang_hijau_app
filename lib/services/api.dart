@@ -19,7 +19,7 @@ class Api {
     final url = Uri.parse('$baseUrl/api/auth/register');
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: _jsonHeaders(),
       body: jsonEncode(body),
     );
 
@@ -33,7 +33,7 @@ class Api {
     final url = Uri.parse('$baseUrl/api/auth/login');
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: _jsonHeaders(),
       body: jsonEncode(body),
     );
 
@@ -71,7 +71,11 @@ class Api {
   }
 
   static Map<String, String> _jsonHeaders([String? token]) {
-    final headers = {'Content-Type': 'application/json'};
+    // Add ngrok-skip-browser-warning header to bypass ngrok browser warning
+    final headers = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
