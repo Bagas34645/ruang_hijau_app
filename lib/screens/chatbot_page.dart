@@ -118,20 +118,34 @@ class _ChatbotPageState extends State<ChatbotPage> {
           return data['error'] ?? 'Terjadi kesalahan pada server.';
         }
       } else if (response.statusCode == 503) {
-        return 'Layanan chatbot sedang loading model atau tidak tersedia. Mohon tunggu sebentar dan coba lagi.';
+        // Service unavailable - likely Ollama or dependencies issue
+        final data = json.decode(response.body);
+        final message =
+            data['message'] ?? 'Layanan chatbot sedang tidak tersedia';
+        return 'Layanan chatbot sedang loading atau error:\n\n$message\n\nMohon:\n1. Tunggu sebentar dan coba lagi\n2. Jika masih error, cek:\n   - Ollama service running (ollama serve)\n   - Flask backend running (python app.py)\n   - Semua dependencies terinstall';
+      } else if (response.statusCode == 500) {
+        // Server error - check logs
+        final data = json.decode(response.body);
+        final message = data['message'] ?? 'Internal server error';
+        return '❌ Server error (500):\n\n$message\n\nCek Flask terminal untuk detail error.';
+      } else if (response.statusCode == 502) {
+        // Bad gateway - backend crashed
+        return '❌ HTTP 502 - Bad Gateway\n\nBackend service tidak merespons. Kemungkinan penyebab:\n\n1. Flask backend crashed\n   → Restart: python app.py\n\n2. Ollama service tidak running\n   → Start: ollama serve\n\n3. Model embedding sedang download\n   → Tunggu 5-10 menit\n\n4. Dependencies missing\n   → Run: pip install -r requirements.txt\n\nCek terminal untuk error details.';
       } else {
-        return 'Server error (${response.statusCode}). Silakan coba lagi.';
+        return 'Server error (${response.statusCode}).\n\nCek konfigurasi:\n- BaseURL di app_config.dart\n- Backend running di http://localhost:5000\n- Firewall tidak memblok port 5000';
       }
     } catch (e) {
       print('Chatbot API Error: $e');
       if (e.toString().contains('timeout')) {
-        return 'Waktu habis. Proses AI memakan waktu lama (biasanya saat pertama kali). Silakan coba kirim pesan lagi.';
+        return 'Waktu habis (300 detik). Proses AI memakan waktu lama.\n\nKemungkinan penyebab:\n- Model embedding terlalu besar\n- PC spec kurang\n- Ollama sedang loading model\n\nSolusi:\n1. Tunggu dan coba lagi\n2. Atau gunakan model lebih kecil (edit OLLAMA_MODEL di .env)\n3. Cek folder ~/.ollama untuk model cache';
       } else if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection refused') ||
           e.toString().contains('XMLHttpRequest')) {
-        return 'Gagal terhubung ke server ($url). \n\nPastikan:\n1. Server Flask berjalan (run_backend.bat)\n2. Konfigurasi IP di app_config.dart benar (jika pakai HP fisik, jangan pakai 10.0.2.2).';
+        return 'Gagal terhubung ke server.\n\nPastikan:\n1. ✅ Server Flask berjalan:\n   - Terminal: cd Ruang-Hijau-Backend && python app.py\n\n2. ✅ Konfigurasi URL benar di app_config.dart:\n   - Android Emulator: http://10.0.2.2:5000\n   - HP Fisik: gunakan IP lokal PC (bukan localhost)\n\n3. ✅ Firewall izinkan port 5000\n\n4. ✅ Backend URL: ${AppConfig.baseUrl}/api/chatbot/chat';
+      } else if (e.toString().contains('FormatException')) {
+        return 'Respons dari server tidak valid (bukan JSON).\n\nMungkin server error atau port salah. Cek:\n- BaseURL di app_config.dart\n- Flask running di port 5000\n- Error di Flask terminal';
       }
-      return 'Maaf, terjadi kesalahan: ${e.toString()}';
+      return 'Error koneksi: ${e.toString()}\n\nSolusi:\n1. Cek Flask terminal untuk error\n2. Jalankan: python test_chatbot_components.py\n3. Verifikasi BaseURL di app_config.dart';
     }
   }
 
