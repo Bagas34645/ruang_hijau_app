@@ -86,9 +86,11 @@ class _ChatbotPageState extends State<ChatbotPage> {
   // CHATBOT RAG API INTEGRATION
   // ============================================
   Future<String> _callChatbotAPI(String userMessage) async {
-    final url = Uri.parse('${AppConfig.baseUrl}/api/chatbot/chat');
+    final url = Uri.parse(AppConfig.getEndpoint('/api/chatbot/chat'));
+
     try {
       print('🚀 [Chatbot] Sending request to: $url');
+      print('📨 [Chatbot] Message: $userMessage');
 
       final response = await http
           .post(
@@ -110,42 +112,79 @@ class _ChatbotPageState extends State<ChatbotPage> {
             },
           );
 
+      print('📥 [Chatbot] Response Status: ${response.statusCode}');
+      print('📥 [Chatbot] Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          return data['response'] ?? 'Tidak ada respons dari server.';
-        } else {
-          return data['error'] ?? 'Terjadi kesalahan pada server.';
+        try {
+          final data = json.decode(response.body);
+
+          // Try different response formats
+          if (data is Map<String, dynamic>) {
+            // Check for 'response' field (success case)
+            if (data['response'] != null) {
+              return data['response'].toString();
+            }
+            // Check for 'success' field
+            if (data['success'] == true && data['response'] != null) {
+              return data['response'].toString();
+            }
+            // Check for 'message' field
+            if (data['message'] != null) {
+              return data['message'].toString();
+            }
+            // Check for 'error' field
+            if (data['error'] != null) {
+              return 'Error: ${data['error'].toString()}';
+            }
+          }
+          return 'Respons dari server tidak jelas. Coba lagi nanti.';
+        } catch (parseError) {
+          print('❌ [Chatbot] JSON Parse Error: $parseError');
+          return 'Gagal memproses respons server. Coba lagi nanti.';
         }
       } else if (response.statusCode == 503) {
         // Service unavailable - likely Ollama or dependencies issue
-        final data = json.decode(response.body);
-        final message =
-            data['message'] ?? 'Layanan chatbot sedang tidak tersedia';
-        return 'Layanan chatbot sedang loading atau error:\n\n$message\n\nMohon:\n1. Tunggu sebentar dan coba lagi\n2. Jika masih error, cek:\n   - Ollama service running (ollama serve)\n   - Flask backend running (python app.py)\n   - Semua dependencies terinstall';
+        try {
+          final data = json.decode(response.body);
+          final message =
+              data['message'] ?? 'Layanan chatbot sedang tidak tersedia';
+          return 'Layanan chatbot sedang loading atau error:\n\n$message\n\nMohon:\n1. Tunggu sebentar dan coba lagi\n2. Jika masih error, cek:\n   - Ollama service running (ollama serve)\n   - Flask backend running (python app.py)\n   - Semua dependencies terinstall';
+        } catch (e) {
+          return 'Service unavailable (503). Cek backend service.';
+        }
       } else if (response.statusCode == 500) {
         // Server error - check logs
-        final data = json.decode(response.body);
-        final message = data['message'] ?? 'Internal server error';
-        return '❌ Server error (500):\n\n$message\n\nCek Flask terminal untuk detail error.';
+        try {
+          final data = json.decode(response.body);
+          final message =
+              data['message'] ?? data['error'] ?? 'Internal server error';
+          print('❌ [Chatbot] Server Error: $message');
+          return '❌ Server error (500):\n\n$message\n\nCek Flask terminal untuk detail error lengkap.';
+        } catch (e) {
+          print('❌ [Chatbot] Server Error (non-JSON): ${response.body}');
+          return '❌ Server error (500):\n\n${response.body}\n\nCek Flask terminal untuk detail error.';
+        }
       } else if (response.statusCode == 502) {
         // Bad gateway - backend crashed
         return '❌ HTTP 502 - Bad Gateway\n\nBackend service tidak merespons. Kemungkinan penyebab:\n\n1. Flask backend crashed\n   → Restart: python app.py\n\n2. Ollama service tidak running\n   → Start: ollama serve\n\n3. Model embedding sedang download\n   → Tunggu 5-10 menit\n\n4. Dependencies missing\n   → Run: pip install -r requirements.txt\n\nCek terminal untuk error details.';
       } else {
-        return 'Server error (${response.statusCode}).\n\nCek konfigurasi:\n- BaseURL di app_config.dart\n- Backend running di http://localhost:5000\n- Firewall tidak memblok port 5000';
+        return 'Server error (${response.statusCode}).\n\nResponse: ${response.body}\n\nCek konfigurasi:\n- BaseURL di app_config.dart\n- Backend running di port yang benar\n- Firewall tidak memblok koneksi';
       }
     } catch (e) {
-      print('Chatbot API Error: $e');
+      print('❌ [Chatbot] Exception: $e');
+      print('❌ [Chatbot] Stack trace: ${e.runtimeType}');
+
       if (e.toString().contains('timeout')) {
         return 'Waktu habis (300 detik). Proses AI memakan waktu lama.\n\nKemungkinan penyebab:\n- Model embedding terlalu besar\n- PC spec kurang\n- Ollama sedang loading model\n\nSolusi:\n1. Tunggu dan coba lagi\n2. Atau gunakan model lebih kecil (edit OLLAMA_MODEL di .env)\n3. Cek folder ~/.ollama untuk model cache';
       } else if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection refused') ||
           e.toString().contains('XMLHttpRequest')) {
-        return 'Gagal terhubung ke server.\n\nPastikan:\n1. ✅ Server Flask berjalan:\n   - Terminal: cd Ruang-Hijau-Backend && python app.py\n\n2. ✅ Konfigurasi URL benar di app_config.dart:\n   - Android Emulator: http://10.0.2.2:5000\n   - HP Fisik: gunakan IP lokal PC (bukan localhost)\n\n3. ✅ Firewall izinkan port 5000\n\n4. ✅ Backend URL: ${AppConfig.baseUrl}/api/chatbot/chat';
+        return 'Gagal terhubung ke server.\n\nPastikan:\n1. ✅ Server Flask berjalan:\n   - Terminal: cd Ruang-Hijau-Backend && python app.py\n\n2. ✅ Konfigurasi URL benar di app_config.dart:\n   - Base URL: ${AppConfig.baseUrl}\n\n3. ✅ Firewall izinkan koneksi\n\n4. ✅ Endpoint: ${AppConfig.getEndpoint('/api/chatbot/chat')}';
       } else if (e.toString().contains('FormatException')) {
-        return 'Respons dari server tidak valid (bukan JSON).\n\nMungkin server error atau port salah. Cek:\n- BaseURL di app_config.dart\n- Flask running di port 5000\n- Error di Flask terminal';
+        return 'Respons dari server tidak valid (bukan JSON).\n\nMungkin server error atau port salah. Cek:\n- BaseURL di app_config.dart\n- Flask running di port yang sesuai\n- Error di Flask terminal';
       }
-      return 'Error koneksi: ${e.toString()}\n\nSolusi:\n1. Cek Flask terminal untuk error\n2. Jalankan: python test_chatbot_components.py\n3. Verifikasi BaseURL di app_config.dart';
+      return 'Error koneksi: ${e.toString()}\n\nSolusi:\n1. Cek Flask terminal untuk error\n2. Verifikasi BaseURL di app_config.dart: ${AppConfig.baseUrl}\n3. Pastikan network connectivity aktif';
     }
   }
 

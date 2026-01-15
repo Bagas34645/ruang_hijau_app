@@ -13,24 +13,24 @@ class AppConfig {
     if (kDebugMode) {
       // Web atau emulator
       if (kIsWeb) {
-        return 'https://api.kumaratech.my.id/';
+        return 'https://api.kumaratech.my.id';
       }
 
       // Android
       if (Platform.isAndroid) {
         // Gunakan 10.0.2.2 untuk Android emulator
         // Atau ganti dengan IP address PC Anda untuk physical device
-        return 'https://api.kumaratech.my.id/';
+        return 'https://api.kumaratech.my.id';
       }
 
       // iOS
       if (Platform.isIOS) {
-        return 'https://api.kumaratech.my.id/';
+        return 'https://api.kumaratech.my.id';
       }
     }
 
     // Production environment - gunakan domain actual
-    return 'https://api.kumaratech.my.id/';
+    return 'https://api.kumaratech.my.id';
   }
 
   /// Construct full image URL dari filename
@@ -48,11 +48,23 @@ class AppConfig {
     return '$baseUrl/uploads/$filename';
   }
 
-  /// Get API base URL
-  static String get apiBaseUrl => baseUrl;
+  /// Get API base URL dengan trailing slash untuk kemudahan concatenation
+  static String get apiBaseUrl {
+    final url = baseUrl;
+    return url.endsWith('/') ? url : '$url/';
+  }
+
+  /// Construct full API endpoint URL dengan proper handling trailing slash
+  static String getEndpoint(String path) {
+    final base = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$base$cleanPath';
+  }
 
   /// Get uploads base URL
-  static String get uploadsBaseUrl => '$baseUrl/uploads';
+  static String get uploadsBaseUrl => getEndpoint('uploads');
 
   // ============================================
   // DEBUG INFO
