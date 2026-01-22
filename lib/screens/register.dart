@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api.dart';
+import '../services/google_auth_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -17,8 +19,12 @@ class _RegisterPageState extends State<RegisterPage> {
   final _phoneCtrl = TextEditingController();
 
   bool _loading = false;
+  bool _googleLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  // Google Sign-In instance
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
 
   @override
   void dispose() {
@@ -28,6 +34,77 @@ class _RegisterPageState extends State<RegisterPage> {
     _confirmPasswordCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
+  }
+
+  // ===== GOOGLE SIGN-IN =====
+  Future<void> _handleGoogleSignIn() async {
+    if (_googleLoading || _loading) return;
+
+    setState(() => _googleLoading = true);
+
+    try {
+      print('DEBUG: Starting Google Sign-In from Register...');
+
+      // Sign out dulu untuk memastikan user bisa pilih akun
+      await _googleSignIn.signOut();
+
+      // Mulai proses sign in
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        print('DEBUG: User cancelled Google Sign-In');
+        if (mounted) {
+          setState(() => _googleLoading = false);
+        }
+        return;
+      }
+
+      print('DEBUG: Google Sign-In successful');
+      print('DEBUG: Email: ${googleUser.email}');
+
+      // Get authentication details
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Kirim ke backend
+      final response = await GoogleAuthService.signInWithGoogle(
+        googleId: googleUser.id,
+        email: googleUser.email,
+        displayName: googleUser.displayName ?? googleUser.email.split('@')[0],
+        photoUrl: googleUser.photoUrl,
+        idToken: googleAuth.idToken,
+        accessToken: googleAuth.accessToken,
+      );
+
+      if (!mounted) return;
+
+      print('DEBUG: Backend response: ${response['statusCode']}');
+
+      if (response['statusCode'] == 200 && response['user'] != null) {
+        final isNewUser = response['isNewUser'] ?? false;
+
+        _showSnackBar(
+          isNewUser
+              ? 'Akun Google berhasil didaftarkan!'
+              : 'Akun Google sudah terdaftar. Login berhasil!',
+          isError: false,
+        );
+
+        // Navigate to home
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      } else {
+        setState(() => _googleLoading = false);
+        final body = response['body'];
+        final message = body?['message'] ?? 'Pendaftaran Google gagal';
+        _showSnackBar(message, isError: true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _googleLoading = false);
+      print('DEBUG: Google Sign-In error: $e');
+      _showSnackBar('Terjadi kesalahan: $e', isError: true);
+    }
   }
 
   Future<void> _register() async {
@@ -197,7 +274,11 @@ class _RegisterPageState extends State<RegisterPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildHeader(),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 24),
+                    _buildGoogleSignInButton(),
+                    const SizedBox(height: 20),
+                    _buildDivider(),
+                    const SizedBox(height: 20),
                     _buildNameField(),
                     const SizedBox(height: 16),
                     _buildEmailField(),
@@ -252,6 +333,76 @@ class _RegisterPageState extends State<RegisterPage> {
           style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           textAlign: TextAlign.center,
         ),
+      ],
+    );
+  }
+
+  Widget _buildGoogleSignInButton() {
+    return OutlinedButton(
+      onPressed: () {
+        if (_loading || _googleLoading) return;
+        _handleGoogleSignIn();
+      },
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+        backgroundColor: Colors.white,
+      ),
+      child: _googleLoading
+          ? SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
+              ),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.network(
+                  'https://www.google.com/favicon.ico',
+                  width: 24,
+                  height: 24,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.g_mobiledata,
+                      color: Colors.red[600],
+                      size: 28,
+                    );
+                  },
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Daftar dengan Google',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'atau daftar dengan email',
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
       ],
     );
   }
@@ -438,7 +589,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildRegisterButton() {
     return ElevatedButton(
-      onPressed: _loading ? null : _register,
+      onPressed: (_loading || _googleLoading) ? null : _register,
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.green[600],
         foregroundColor: Colors.white,

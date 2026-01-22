@@ -59,26 +59,21 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: Colors.green[50],
       body: SafeArea(
         child: Center(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildLogo(),
-                      const SizedBox(height: 32),
-                      _buildTitle(),
-                      const SizedBox(height: 48),
-                      _buildLoadingIndicator(),
-                    ],
-                  ),
-                ),
-              );
-            },
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLogo(),
+                  const SizedBox(height: 32),
+                  _buildTitle(),
+                  const SizedBox(height: 48),
+                  _buildLoadingIndicator(),
+                ],
+              ),
+            ),
           ),
         ),
       ),
