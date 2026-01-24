@@ -65,6 +65,44 @@ class Api {
     await prefs.remove('user_id');
   }
 
+  // Update profile user
+  static Future<Map<String, dynamic>> updateProfile(
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+
+      if (userId == null || userId.isEmpty) {
+        return {
+          'statusCode': 401,
+          'body': {'message': 'User not authenticated'},
+        };
+      }
+
+      final url = Uri.parse('$baseUrl/api/users/$userId');
+      final res = await http.put(
+        url,
+        headers: _jsonHeaders(),
+        body: jsonEncode(body),
+      );
+
+      print('DEBUG updateProfile: statusCode=${res.statusCode}');
+      print('DEBUG updateProfile: body=${res.body}');
+
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG updateProfile ERROR: $e');
+      return {
+        'statusCode': 500,
+        'body': {'message': 'Error: $e'},
+      };
+    }
+  }
+
   static Future<String?> _token() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');

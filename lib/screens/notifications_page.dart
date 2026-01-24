@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/notification_model.dart';
+import '../services/notification_service.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -8,98 +10,226 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  final List<Map<String, dynamic>> notifications = [
-    {
-      'id': 1,
-      'type': 'like',
-      'username': 'Eco Station',
-      'message': 'menyukai postingan Anda',
-      'time': '5 menit yang lalu',
-      'read': false,
-      'avatar': 'https://picsum.photos/200',
-    },
-    {
-      'id': 2,
-      'type': 'comment',
-      'username': 'Nature Squad',
-      'message': 'mengomentari postingan Anda: "Kegiatan yang sangat bagus!"',
-      'time': '15 menit yang lalu',
-      'read': false,
-      'avatar': 'https://picsum.photos/201',
-    },
-    {
-      'id': 3,
-      'type': 'follow',
-      'username': 'Green Warrior',
-      'message': 'mulai mengikuti Anda',
-      'time': '1 jam yang lalu',
-      'read': true,
-      'avatar': 'https://picsum.photos/202',
-    },
-  ];
+  late Future<List<NotificationModel>> _notificationsFuture;
+  List<NotificationModel> _notifications = [];
+  bool _isLoading = false;
 
-  void _markAsRead(int id) {
-    setState(() {
-      final index = notifications.indexWhere((n) => n['id'] == id);
-      if (index != -1) {
-        notifications[index]['read'] = true;
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _notificationsFuture = NotificationService.getNotifications();
   }
 
-  void _markAllAsRead() {
+  @override
+  void dispose() {
+    NotificationService.closeNotificationStream();
+    super.dispose();
+  }
+
+  Future<void> _refreshNotifications() async {
     setState(() {
-      for (var notification in notifications) {
-        notification['read'] = true;
-      }
+      _isLoading = true;
     });
+    try {
+      final notifications = await NotificationService.getNotifications();
+      setState(() {
+        _notifications = notifications;
+      });
+    } catch (e) {
+      print('Error refreshing notifications: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _markAsRead(int id) async {
+    final success = await NotificationService.markAsRead(id);
+    if (success) {
+      setState(() {
+        final index = _notifications.indexWhere((n) => n.id == id);
+        if (index != -1) {
+          _notifications[index] = _notifications[index].copyWith(read: true);
+        }
+      });
+    }
+  }
+
+  void _markAllAsRead() async {
+    final success = await NotificationService.markAllAsRead();
+    if (success) {
+      setState(() {
+        _notifications = _notifications
+            .map((n) => n.copyWith(read: true))
+            .toList();
+      });
+    }
+  }
+
+  void _deleteNotification(int id) async {
+    final success = await NotificationService.deleteNotification(id);
+    if (success) {
+      setState(() {
+        _notifications.removeWhere((n) => n.id == id);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = notifications.where((n) => n['read'] == false).length;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF2E7D32)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Notifikasi',
-          style: TextStyle(
-            color: Color(0xFF2E7D32),
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        actions: [
-          if (unreadCount > 0)
-            TextButton(
-              onPressed: _markAllAsRead,
-              child: const Text(
-                'Tandai Semua',
+    return FutureBuilder<List<NotificationModel>>(
+      future: _notificationsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            _notifications.isEmpty) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFFAFAFA),
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF2E7D32)),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text(
+                'Notifikasi',
                 style: TextStyle(
-                  color: Color(0xFF43A047),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF2E7D32),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
                 ),
               ),
             ),
-        ],
-      ),
-      body: notifications.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: notifications.length,
-              itemBuilder: (context, index) {
-                return _buildNotificationItem(notifications[index]);
-              },
+            body: const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(Color(0xFF43A047)),
+              ),
             ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFFAFAFA),
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF2E7D32)),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text(
+                'Notifikasi',
+                style: TextStyle(
+                  color: Color(0xFF2E7D32),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Color(0xFFE53935),
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Gagal memuat notifikasi'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _refreshNotifications,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF43A047),
+                    ),
+                    child: const Text(
+                      'Coba Lagi',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Update notifications dari snapshot
+        if (snapshot.hasData && _notifications.isEmpty) {
+          _notifications = snapshot.data ?? [];
+        }
+
+        final unreadCount = _notifications.where((n) => !n.read).length;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFFAFAFA),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Color(0xFF2E7D32)),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(
+              'Notifikasi',
+              style: TextStyle(
+                color: Color(0xFF2E7D32),
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            actions: [
+              if (unreadCount > 0)
+                TextButton(
+                  onPressed: _markAllAsRead,
+                  child: const Text(
+                    'Tandai Semua',
+                    style: TextStyle(
+                      color: Color(0xFF43A047),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          body: _notifications.isEmpty
+              ? _buildEmptyState()
+              : RefreshIndicator(
+                  onRefresh: _refreshNotifications,
+                  color: const Color(0xFF43A047),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _notifications.length,
+                    itemBuilder: (context, index) {
+                      return Dismissible(
+                        key: Key(_notifications[index].id.toString()),
+                        direction: DismissDirection.endToStart,
+                        onDismissed: (direction) {
+                          _deleteNotification(_notifications[index].id);
+                        },
+                        background: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53935),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 16),
+                          child: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.white,
+                          ),
+                        ),
+                        child: _buildNotificationItem(_notifications[index]),
+                      );
+                    },
+                  ),
+                ),
+        );
+      },
     );
   }
 
@@ -144,20 +274,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-  Widget _buildNotificationItem(Map<String, dynamic> notification) {
+  Widget _buildNotificationItem(NotificationModel notification) {
     return GestureDetector(
-      onTap: () => _markAsRead(notification['id']),
+      onTap: () => _markAsRead(notification.id),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: notification['read'] ? Colors.white : const Color(0xFFE8F5E9),
+          color: notification.read ? Colors.white : const Color(0xFFE8F5E9),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: notification['read']
+            color: notification.read
                 ? const Color(0xFFE0E0E0)
                 : const Color(0xFF43A047).withOpacity(0.3),
-            width: notification['read'] ? 1 : 2,
+            width: notification.read ? 1 : 2,
           ),
           boxShadow: [
             BoxShadow(
@@ -183,7 +313,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           text: TextSpan(
                             children: [
                               TextSpan(
-                                text: notification['username'],
+                                text: notification.username,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
@@ -191,7 +321,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                 ),
                               ),
                               TextSpan(
-                                text: ' ${notification['message']}',
+                                text: ' ${notification.message}',
                                 style: const TextStyle(
                                   fontSize: 14,
                                   color: Color(0xFF424242),
@@ -201,7 +331,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           ),
                         ),
                       ),
-                      if (!notification['read'])
+                      if (!notification.read)
                         Container(
                           width: 10,
                           height: 10,
@@ -222,7 +352,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        notification['time'],
+                        notification.time,
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey.shade600,
@@ -239,10 +369,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-  Widget _buildAvatar(Map<String, dynamic> notification) {
-    final type = notification['type'];
-    
-    if (notification['avatar'] == null) {
+  Widget _buildAvatar(NotificationModel notification) {
+    final type = notification.type;
+
+    if (notification.avatar == null) {
       return Container(
         width: 50,
         height: 50,
@@ -250,11 +380,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           color: _getTypeColor(type).withOpacity(0.2),
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          _getTypeIcon(type),
-          color: _getTypeColor(type),
-          size: 24,
-        ),
+        child: Icon(_getTypeIcon(type), color: _getTypeColor(type), size: 24),
       );
     }
 
@@ -272,7 +398,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         children: [
           ClipOval(
             child: Image.network(
-              notification['avatar'],
+              notification.avatar!,
               width: 50,
               height: 50,
               fit: BoxFit.cover,
@@ -296,11 +422,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: Icon(
-                _getTypeIcon(type),
-                color: Colors.white,
-                size: 12,
-              ),
+              child: Icon(_getTypeIcon(type), color: Colors.white, size: 12),
             ),
           ),
         ],

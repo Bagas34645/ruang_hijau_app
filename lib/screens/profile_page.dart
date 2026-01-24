@@ -439,28 +439,87 @@ class _ProfilePageState extends State<ProfilePage> {
                         Expanded(
                           flex: 2,
                           child: ElevatedButton(
-                            onPressed: () {
-                              // TODO: Implementasi update profile ke API
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Row(
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.white,
+                            onPressed: () async {
+                              // Update profile ke API
+                              final newName = nameController.text.trim();
+                              final newEmail = emailController.text.trim();
+
+                              if (newName.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                      'Nama tidak boleh kosong',
+                                    ),
+                                    backgroundColor: const Color(0xFFD32F2F),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              try {
+                                // Call API update profile
+                                final res = await Api.updateProfile({
+                                  'name': newName,
+                                  'email': newEmail,
+                                });
+
+                                if (!mounted) return;
+
+                                if (res['statusCode'] == 200) {
+                                  // Update user data di memory
+                                  setState(() {
+                                    user?['name'] = newName;
+                                    user?['email'] = newEmail;
+                                  });
+
+                                  // Save updated user to SharedPreferences
+                                  final prefs =
+                                      await SharedPreferences.getInstance();
+                                  await prefs.setString(
+                                    'user',
+                                    jsonEncode(user),
+                                  );
+
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Row(
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle,
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: 12),
+                                          Text('Profile berhasil diperbarui!'),
+                                        ],
                                       ),
-                                      SizedBox(width: 12),
-                                      Text('Profile berhasil diperbarui!'),
-                                    ],
+                                      backgroundColor: const Color(0xFF43A047),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        'Gagal memperbarui profile',
+                                      ),
+                                      backgroundColor: const Color(0xFFD32F2F),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                print('Error updating profile: $e');
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Terjadi kesalahan'),
+                                    backgroundColor: const Color(0xFFD32F2F),
                                   ),
-                                  backgroundColor: const Color(0xFF43A047),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF43A047),
