@@ -24,7 +24,7 @@ class _BerandaPageState extends State<BerandaPage>
   int _currentIndex = 0;
   late AnimationController _fabController;
   Map<int, bool> likedPosts = {};
-  Map<int, List<Map<String, String>>> postComments = {};
+  Map<int, List<Map<String, dynamic>>> postComments = {};
   TextEditingController commentController = TextEditingController();
   int? _currentUserId;
 
@@ -410,245 +410,407 @@ class _BerandaPageState extends State<BerandaPage>
   // COMMENT BOTTOM SHEET
   // =====================
   void _showCommentSheet(BuildContext context, Map<String, dynamic> post) {
+    final int postId = post['id'] as int;
+    bool startedFetch = false;
+    bool loadingComments = true;
+    bool sendingComment = false;
+    String? loadError;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              // HANDLE BAR
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // HEADER
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    const Text(
-                      'Komentar',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E7D32),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${post['commentsCount']}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 24),
-              // COMMENTS LIST
-              Expanded(
-                child: postComments[post['id']]?.isEmpty ?? true
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.comment_outlined,
-                              size: 48,
-                              color: Colors.grey[300],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Belum ada komentar',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: scrollController,
-                        itemCount: postComments[post['id']]?.length ?? 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemBuilder: (context, index) {
-                          final comment = postComments[post['id']]![index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: const Color(
-                                    0xFF43A047,
-                                  ).withOpacity(0.2),
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 20,
-                                    color: Color(0xFF43A047),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        comment['username'] ?? 'User',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        comment['text'] ?? '',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        comment['time'] ?? 'Baru saja',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[500],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              // COMMENT INPUT
-              Container(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Color(0xFF43A047),
-                        child: Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: commentController,
-                          decoration: InputDecoration(
-                            hintText: 'Tulis komentar...',
-                            hintStyle: TextStyle(color: Colors.grey[400]),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: BorderSide(color: Colors.grey[300]!),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF43A047),
-                                width: 2,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF43A047),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.send, color: Colors.white),
-                          onPressed: () {
-                            if (commentController.text.isNotEmpty) {
-                              setState(() {
-                                postComments[post['id']]?.add({
-                                  'username': 'Saya',
-                                  'text': commentController.text,
-                                  'time': 'Baru saja',
-                                });
-                              });
-                              commentController.clear();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Row(
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.white,
-                                      ),
-                                      SizedBox(width: 12),
-                                      Text('Komentar berhasil dikirim!'),
-                                    ],
-                                  ),
-                                  backgroundColor: const Color(0xFF43A047),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                      ),
-                    ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          Future<void> loadComments() async {
+            setModalState(() {
+              loadingComments = true;
+              loadError = null;
+            });
+            try {
+              final res = await Api.fetchComments(postId);
+              if (res['statusCode'] == 200 && res['body'] != null) {
+                final body = res['body'] as Map<String, dynamic>;
+                final data = body['data'] as List<dynamic>? ?? [];
+                final mapped = data.map<Map<String, dynamic>>((e) {
+                  final m = e as Map<String, dynamic>;
+                  return {
+                    'id': m['id'],
+                    'userId': m['user_id'],
+                    'username': m['author_name'] ?? 'User',
+                    'profilePhoto': m['profile_photo'],
+                    'text': m['text'] ?? '',
+                    'createdAt': m['created_at'],
+                  };
+                }).toList();
+                setState(() {
+                  postComments[postId] = mapped;
+                });
+              } else {
+                loadError = res['body']?['message'] ?? 'Gagal memuat komentar';
+              }
+            } catch (e) {
+              loadError = e.toString();
+            } finally {
+              setModalState(() => loadingComments = false);
+            }
+          }
+
+          if (!startedFetch) {
+            startedFetch = true;
+            // Fire and forget - update modal state when done
+            loadComments();
+          }
+
+          Future<void> sendComment() async {
+            final text = commentController.text.trim();
+            if (text.isEmpty) return;
+
+            final userId = _currentUserId;
+            if (userId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Silakan login dulu untuk berkomentar.'),
+                  backgroundColor: Colors.red[400],
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+              );
+              return;
+            }
+
+            setModalState(() => sendingComment = true);
+            try {
+              final res = await Api.addComment(
+                postId: postId,
+                userId: userId,
+                text: text,
+              );
+
+              if (res['statusCode'] == 201 || res['statusCode'] == 200) {
+                commentController.clear();
+
+                // Update count locally for better UX
+                setState(() {
+                  post['commentsCount'] = (post['commentsCount'] ?? 0) + 1;
+                });
+
+                await loadComments();
+              } else {
+                final message =
+                    res['body']?['message'] ?? 'Gagal mengirim komentar';
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $message'),
+                    backgroundColor: Colors.red[400],
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              }
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Terjadi kesalahan: $e'),
+                  backgroundColor: Colors.red[400],
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              );
+            } finally {
+              setModalState(() => sendingComment = false);
+            }
+          }
+
+          final comments = postComments[postId] ?? [];
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (context, scrollController) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-            ],
-          ),
-        ),
+              child: Column(
+                children: [
+                  // HANDLE BAR
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // HEADER
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Komentar',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${post['commentsCount']}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 24),
+                  // COMMENTS LIST
+                  Expanded(
+                    child: loadingComments
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF43A047),
+                              strokeWidth: 3,
+                            ),
+                          )
+                        : loadError != null
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.error_outline,
+                                        size: 44,
+                                        color: Colors.red[300],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        loadError!,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ElevatedButton(
+                                        onPressed: loadComments,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF43A047),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: const Text('Coba lagi'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : comments.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.comment_outlined,
+                                          size: 48,
+                                          color: Colors.grey[300],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Belum ada komentar',
+                                          style: TextStyle(
+                                            color: Colors.grey[500],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    controller: scrollController,
+                                    itemCount: comments.length,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final comment = comments[index];
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 16),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 18,
+                                              backgroundColor:
+                                                  const Color(0xFF43A047)
+                                                      .withOpacity(0.2),
+                                              child: const Icon(
+                                                Icons.person,
+                                                size: 20,
+                                                color: Color(0xFF43A047),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    (comment['username']
+                                                            as String?) ??
+                                                        'User',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    (comment['text']
+                                                            as String?) ??
+                                                        '',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    (comment['createdAt']
+                                                            as String?) ??
+                                                        'Baru saja',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[500],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                  ),
+                  // COMMENT INPUT
+                  Container(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Color(0xFF43A047),
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: commentController,
+                              enabled: !sendingComment,
+                              decoration: InputDecoration(
+                                hintText: 'Tulis komentar...',
+                                hintStyle: TextStyle(color: Colors.grey[400]),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey[300]!),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey[300]!),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF43A047),
+                                    width: 2,
+                                  ),
+                                ),
+                                contentPadding:
+                                    const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF43A047),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: sendingComment
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.send,
+                                      color: Colors.white,
+                                    ),
+                              onPressed: sendingComment ? null : sendComment,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

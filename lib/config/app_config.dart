@@ -13,24 +13,28 @@ class AppConfig {
     if (kDebugMode) {
       // Web atau emulator
       if (kIsWeb) {
-        return 'https://api.kumaratech.my.id';
+        // return 'https://api.kumaratech.my.id';
+        return 'http://192.168.18.122:5000';
       }
 
       // Android
       if (Platform.isAndroid) {
         // Gunakan 10.0.2.2 untuk Android emulator
         // Atau ganti dengan IP address PC Anda untuk physical device
-        return 'https://api.kumaratech.my.id';
+        // return 'https://api.kumaratech.my.id';
+        return 'http://192.168.18.122:5000';
       }
 
       // iOS
       if (Platform.isIOS) {
-        return 'https://api.kumaratech.my.id';
+        // return 'https://api.kumaratech.my.id';
+        return 'http://192.168.18.122:5000';
       }
     }
 
     // Production environment - gunakan domain actual
-    return 'https://api.kumaratech.my.id';
+    // return 'https://api.kumaratech.my.id';
+    return 'http://192.168.18.122:5000';
   }
 
   /// Construct full image URL dari filename

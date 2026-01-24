@@ -575,7 +575,9 @@ class Api {
 
   // --- Comments ---
   static Future<Map<String, dynamic>> fetchComments(int postId) async {
-    final url = Uri.parse('$baseUrl/comment/$postId');
+    // Flask backend registers comment routes under /api/comments
+    // GET /api/comments/<post_id>
+    final url = Uri.parse('$baseUrl/api/comments/$postId');
     final token = await _token();
     try {
       print('DEBUG fetchComments: Requesting $url');
@@ -599,12 +601,15 @@ class Api {
     }
   }
 
-  static Future<Map<String, dynamic>> addComment(
-    int postId,
-    Map<String, dynamic> body,
-  ) async {
-    final url = Uri.parse('$baseUrl/comment/add');
+  static Future<Map<String, dynamic>> addComment({
+    required int postId,
+    required int userId,
+    required String text,
+  }) async {
+    // POST /api/comments/
+    final url = Uri.parse('$baseUrl/api/comments/');
     final token = await _token();
+    final body = {'post_id': postId, 'user_id': userId, 'text': text};
     try {
       print('DEBUG addComment: Requesting $url with body=$body');
       final res = await http
