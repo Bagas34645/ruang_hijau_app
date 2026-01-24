@@ -638,14 +638,30 @@ class Api {
     required int rating,
     required String message,
   }) async {
-    final url = Uri.parse('$baseUrl/api/feedback');
+    final url = Uri.parse('$baseUrl/api/feedback/');
     final token = await _token();
 
     try {
-      print('DEBUG submitFeedback: Requesting $url');
-      print('DEBUG submitFeedback: category=$category, rating=$rating');
+      // Get user_id from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id');
 
-      final body = {'category': category, 'rating': rating, 'message': message};
+      if (userId == null) {
+        return {
+          'statusCode': 401,
+          'body': {'message': 'User not authenticated'},
+        };
+      }
+
+      print('DEBUG submitFeedback: Requesting $url');
+      print('DEBUG submitFeedback: category=$category, rating=$rating, user_id=$userId');
+
+      final body = {
+        'user_id': userId,
+        'category': category,
+        'rating': rating,
+        'message': message,
+      };
 
       final res = await http
           .post(url, headers: _jsonHeaders(token), body: jsonEncode(body))
