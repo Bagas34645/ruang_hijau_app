@@ -161,6 +161,70 @@ class Api {
     return createPost(body);
   }
 
+  static Future<Map<String, dynamic>> updatePost(
+    int postId,
+    Map<String, dynamic> body,
+  ) async {
+    final url = Uri.parse('$baseUrl/api/posts/$postId');
+    final token = await _token();
+    final res = await http.put(
+      url,
+      headers: _jsonHeaders(token),
+      body: jsonEncode(body),
+    );
+    return {
+      'statusCode': res.statusCode,
+      'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+    };
+  }
+
+  static Future<Map<String, dynamic>> updatePostMultipart(
+    int postId,
+    Map<String, dynamic> body, {
+    Uint8List? imageBytes,
+    String? filename,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/posts/$postId');
+    final token = await _token();
+    if (imageBytes != null && filename != null) {
+      final request = http.MultipartRequest('POST', url);
+      request.headers.addAll({'Accept': 'application/json'});
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.fields.addAll(body.map((k, v) => MapEntry(k, v.toString())));
+
+      final mimeType = lookupMimeType(filename) ?? 'application/octet-stream';
+      final parts = mimeType.split('/');
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: filename,
+          contentType: MediaType(parts[0], parts[1]),
+        ),
+      );
+
+      final streamed = await request.send();
+      final res = await http.Response.fromStream(streamed);
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    }
+    return updatePost(postId, body);
+  }
+
+  static Future<Map<String, dynamic>> deletePost(int postId) async {
+    final url = Uri.parse('$baseUrl/api/posts/$postId');
+    final token = await _token();
+    final res = await http.delete(url, headers: _jsonHeaders(token));
+    return {
+      'statusCode': res.statusCode,
+      'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+    };
+  }
+
   // --- Events ---
   static Future<Map<String, dynamic>> fetchEvents() async {
     final url = Uri.parse('$baseUrl/events');
@@ -521,6 +585,44 @@ class Api {
       };
     } catch (e) {
       print('DEBUG addComment ERROR: $e');
+      rethrow;
+    }
+  }
+
+  // --- Feedback ---
+  static Future<Map<String, dynamic>> submitFeedback({
+    required String category,
+    required int rating,
+    required String message,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/feedback');
+    final token = await _token();
+
+    try {
+      print('DEBUG submitFeedback: Requesting $url');
+      print('DEBUG submitFeedback: category=$category, rating=$rating');
+
+      final body = {'category': category, 'rating': rating, 'message': message};
+
+      final res = await http
+          .post(url, headers: _jsonHeaders(token), body: jsonEncode(body))
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print('DEBUG submitFeedback: Request TIMEOUT after 10 seconds');
+              throw TimeoutException('Request timeout');
+            },
+          );
+
+      print('DEBUG submitFeedback: statusCode=${res.statusCode}');
+      print('DEBUG submitFeedback: body=${res.body}');
+
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG submitFeedback ERROR: $e');
       rethrow;
     }
   }

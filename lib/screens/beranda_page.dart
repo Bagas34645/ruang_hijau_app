@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api.dart';
 import '../config/app_config.dart';
 import 'profile_page.dart';
 import 'add_post_page.dart';
+import 'edit_post_page.dart';
 import 'notifications_page.dart';
 import 'campaign_page.dart';
 import 'chatbot_page.dart';
@@ -20,10 +23,15 @@ class _BerandaPageState extends State<BerandaPage>
   bool _loading = true;
   int _currentIndex = 0;
   late AnimationController _fabController;
+  Map<int, bool> likedPosts = {};
+  Map<int, List<Map<String, String>>> postComments = {};
+  TextEditingController commentController = TextEditingController();
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _loadPosts();
     _fabController = AnimationController(
       vsync: this,
@@ -31,9 +39,17 @@ class _BerandaPageState extends State<BerandaPage>
     );
   }
 
+  Future<void> _loadCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('user_id');
+    setState(() => _currentUserId = userId);
+    print('DEBUG: Current user_id: $_currentUserId');
+  }
+
   @override
   void dispose() {
     _fabController.dispose();
+    commentController.dispose();
     super.dispose();
   }
 
@@ -61,8 +77,13 @@ class _BerandaPageState extends State<BerandaPage>
           final imageUrl = AppConfig.getImageUrl(imageFilename);
           print('DEBUG: Post ${e['id']} image: $imageFilename -> $imageUrl');
 
+          final postId = e['id'] as int;
+          likedPosts[postId] = false;
+          postComments[postId] = [];
+
           return {
-            'id': e['id'],
+            'id': postId,
+            'userId': e['user_id'] as int,
             'username': e['author_name'] ?? 'User ${e['user_id'] ?? 'unknown'}',
             'imageUrl': imageUrl,
             'caption': e['text'] ?? '',
@@ -369,6 +390,23 @@ class _BerandaPageState extends State<BerandaPage>
   }
 
   // =====================
+  // MENU BUTTON WIDGET
+  // =====================
+  Widget _buildMenuButton(BuildContext context, Map<String, dynamic> post) {
+    final isOwner = post['userId'] == _currentUserId;
+    print(
+      'DEBUG: Menu button check - Post owner: ${post['userId']}, Current user: $_currentUserId, Show menu: $isOwner',
+    );
+    return isOwner
+        ? IconButton(
+            icon: const Icon(Icons.more_vert, size: 20),
+            color: Colors.grey[600],
+            onPressed: () => _showPostMenu(context, post),
+          )
+        : const SizedBox.shrink();
+  }
+
+  // =====================
   // COMMENT BOTTOM SHEET
   // =====================
   void _showCommentSheet(BuildContext context, Map<String, dynamic> post) {
@@ -425,62 +463,86 @@ class _BerandaPageState extends State<BerandaPage>
               const Divider(height: 24),
               // COMMENTS LIST
               Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: post['commentsCount'],
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: const Color(0xFF43A047),
-                          child: Text(
-                            'U${index + 1}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                child: postComments[post['id']]?.isEmpty ?? true
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.comment_outlined,
+                              size: 48,
+                              color: Colors.grey[300],
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Belum ada komentar',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'User ${index + 1}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: postComments[post['id']]?.length ?? 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemBuilder: (context, index) {
+                          final comment = postComments[post['id']]![index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: const Color(
+                                    0xFF43A047,
+                                  ).withOpacity(0.2),
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 20,
+                                    color: Color(0xFF43A047),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Keren banget! Semoga makin banyak yang ikut aksi hijau seperti ini 🌱',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[800],
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        comment['username'] ?? 'User',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        comment['text'] ?? '',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        comment['time'] ?? 'Baru saja',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[500],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${index + 1}h',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
               ),
               // COMMENT INPUT
               Container(
@@ -513,6 +575,7 @@ class _BerandaPageState extends State<BerandaPage>
                       const SizedBox(width: 12),
                       Expanded(
                         child: TextField(
+                          controller: commentController,
                           decoration: InputDecoration(
                             hintText: 'Tulis komentar...',
                             hintStyle: TextStyle(color: Colors.grey[400]),
@@ -547,26 +610,35 @@ class _BerandaPageState extends State<BerandaPage>
                         child: IconButton(
                           icon: const Icon(Icons.send, color: Colors.white),
                           onPressed: () {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: Colors.white,
-                                    ),
-                                    SizedBox(width: 12),
-                                    Text('Komentar berhasil dikirim!'),
-                                  ],
+                            if (commentController.text.isNotEmpty) {
+                              setState(() {
+                                postComments[post['id']]?.add({
+                                  'username': 'Saya',
+                                  'text': commentController.text,
+                                  'time': 'Baru saja',
+                                });
+                              });
+                              commentController.clear();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.white,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text('Komentar berhasil dikirim!'),
+                                    ],
+                                  ),
+                                  backgroundColor: const Color(0xFF43A047),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                                backgroundColor: const Color(0xFF43A047),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            );
+                              );
+                            }
                           },
                         ),
                       ),
@@ -646,36 +718,13 @@ class _BerandaPageState extends State<BerandaPage>
             _buildShareOption(
               context,
               icon: Icons.message,
-              title: 'WhatsApp',
-              color: const Color(0xFF25D366),
+              title: 'Bagikan',
+              color: const Color(0xFF43A047),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Membuka WhatsApp...')),
-                );
-              },
-            ),
-            _buildShareOption(
-              context,
-              icon: Icons.facebook,
-              title: 'Facebook',
-              color: const Color(0xFF1877F2),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Membuka Facebook...')),
-                );
-              },
-            ),
-            _buildShareOption(
-              context,
-              icon: Icons.camera_alt,
-              title: 'Instagram',
-              color: const Color(0xFFE1306C),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Membuka Instagram...')),
+                Share.share(
+                  'Lihat postingan menarik dari RuangHijau!\n\n${post['caption']}\n\nDownload aplikasi RuangHijau sekarang!',
+                  subject: 'RuangHijau - Berbagi Kebaikan Hijau',
                 );
               },
             ),
@@ -839,11 +888,7 @@ class _BerandaPageState extends State<BerandaPage>
                     color: const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.more_vert, size: 20),
-                    color: Colors.grey[600],
-                    onPressed: () {},
-                  ),
+                  child: _buildMenuButton(context, post),
                 ),
               ],
             ),
@@ -1126,5 +1171,212 @@ class _BerandaPageState extends State<BerandaPage>
         ],
       ),
     );
+  }
+
+  // =====================
+  // POST MENU
+  // =====================
+  void _showPostMenu(BuildContext context, Map<String, dynamic> post) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.edit_outlined,
+                  color: Colors.blue[700],
+                  size: 24,
+                ),
+              ),
+              title: const Text(
+                'Edit Post',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditPostPage(
+                      postId: post['id'],
+                      currentCaption: post['caption'],
+                      imageUrl: post['imageUrl'],
+                    ),
+                  ),
+                ).then((result) {
+                  if (result == true) {
+                    _loadPosts();
+                  }
+                });
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Colors.red[700],
+                  size: 24,
+                ),
+              ),
+              title: const Text(
+                'Hapus Post',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: Color(0xFFD32F2F),
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmation(post);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // =====================
+  // DELETE CONFIRMATION
+  // =====================
+  void _showDeleteConfirmation(Map<String, dynamic> post) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Post'),
+        content: const Text(
+          'Apakah Anda yakin ingin menghapus post ini? Tindakan ini tidak dapat dibatalkan.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: Color(0xFF757575)),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePost(post['id']);
+            },
+            child: const Text(
+              'Hapus',
+              style: TextStyle(color: Color(0xFFD32F2F)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =====================
+  // DELETE POST
+  // =====================
+  Future<void> _deletePost(int postId) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Menghapus post...'),
+            ],
+          ),
+          backgroundColor: Color(0xFF757575),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      final res = await Api.deletePost(postId);
+
+      if (!mounted) return;
+
+      if (res['statusCode'] == 200 || res['statusCode'] == 204) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Post berhasil dihapus!'),
+              ],
+            ),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+        await Future.delayed(const Duration(milliseconds: 500));
+        _loadPosts();
+      } else {
+        final message = res['body']?['message'] ?? 'Gagal menghapus post';
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $message'),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Terjadi kesalahan: $e'),
+          backgroundColor: Colors.red[700],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
   }
 }

@@ -74,13 +74,28 @@ class _EditCampaignPageState extends State<EditCampaignPage> {
     );
 
     selectedCategory = widget.campaign['category'];
-    needVolunteers = widget.campaign['need_volunteers'] ?? true;
+
+    // ✅ FIX: Convert any type to boolean
+    needVolunteers = _parseBool(widget.campaign['need_volunteers']);
 
     // Set existing image URL
     if (widget.campaign['image'] != null &&
         widget.campaign['image'].toString().isNotEmpty) {
       _existingImageUrl = AppConfig.getImageUrl(widget.campaign['image']);
     }
+  }
+
+  // ✅ TAMBAHAN: Helper function untuk convert ke boolean
+  bool _parseBool(dynamic value) {
+    if (value == null) return true; // Default value
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is String) {
+      return value == '1' ||
+          value.toLowerCase() == 'true' ||
+          value.toLowerCase() == 'yes';
+    }
+    return true; // Default fallback
   }
 
   Future<void> _pickImage() async {
@@ -393,7 +408,7 @@ class _EditCampaignPageState extends State<EditCampaignPage> {
                 onTap: _removeImage,
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
                   ),
@@ -422,7 +437,7 @@ class _EditCampaignPageState extends State<EditCampaignPage> {
                 onTap: _removeImage,
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
                   ),
@@ -460,7 +475,7 @@ class _EditCampaignPageState extends State<EditCampaignPage> {
               onTap: _removeImage,
               child: Container(
                 padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.red,
                   shape: BoxShape.circle,
                 ),
@@ -595,7 +610,7 @@ class _EditCampaignPageState extends State<EditCampaignPage> {
               const SizedBox(height: 12),
 
               DropdownButtonFormField<String>(
-                initialValue: selectedCategory,
+                value: selectedCategory,
                 decoration: InputDecoration(
                   labelText: 'Kategori *',
                   filled: true,
