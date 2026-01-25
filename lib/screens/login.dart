@@ -404,31 +404,8 @@ class _LoginPageState extends State<LoginPage> {
           : Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Google Logo
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    image: DecorationImage(
-                      image: NetworkImage(
-                        'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                      ),
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  child: Image.network(
-                    'https://www.google.com/favicon.ico',
-                    width: 24,
-                    height: 24,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.g_mobiledata,
-                        color: Colors.red[600],
-                        size: 28,
-                      );
-                    },
-                  ),
-                ),
+                // Google Logo - Using custom paint widget for Google logo
+                _buildGoogleLogo(),
                 const SizedBox(width: 12),
                 Text(
                   'Lanjutkan dengan Google',
@@ -440,6 +417,17 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildGoogleLogo() {
+    return Image.asset(
+      'assets/images/google_logo.png',
+      width: 24,
+      height: 24,
+      errorBuilder: (context, error, stackTrace) {
+        return Icon(Icons.g_mobiledata, color: Colors.red[600], size: 28);
+      },
     );
   }
 
