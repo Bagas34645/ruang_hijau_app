@@ -13,6 +13,7 @@ import 'screens/my_volunteer_page.dart';
 import 'screens/payment_page.dart';
 import 'screens/feedback_page.dart';
 import 'screens/profile_page.dart';
+import 'screens/waste_detection_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -44,6 +45,7 @@ class MyApp extends StatelessWidget {
         '/payment': (c) => const PaymentPage(),
         '/feedback': (c) => const FeedbackPage(),
         '/profile': (c) => const ProfilePage(),
+        '/waste-detection': (c) => const WasteDetectionPage(),
       },
     );
   }

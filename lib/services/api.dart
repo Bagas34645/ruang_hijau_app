@@ -745,4 +745,80 @@ class Api {
       };
     }
   }
+
+  // --- WASTE DETECTION ---
+  static Future<Map<String, dynamic>> detectWaste(
+    Uint8List fileBytes,
+    String filename,
+  ) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/waste/detect');
+
+      final request = http.MultipartRequest('POST', url);
+      request.files.add(
+        http.MultipartFile.fromBytes('file', fileBytes, filename: filename),
+      );
+
+      print('DEBUG detectWaste: Uploading file $filename to $url');
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('DEBUG detectWaste: statusCode=${response.statusCode}');
+      print('DEBUG detectWaste: body=${response.body}');
+
+      return {
+        'statusCode': response.statusCode,
+        'body': response.body.isNotEmpty ? jsonDecode(response.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG detectWaste ERROR: $e');
+      return {
+        'statusCode': 500,
+        'body': {'success': false, 'message': 'Error: $e'},
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> getWasteCategories() async {
+    try {
+      final url = Uri.parse('$baseUrl/api/waste/categories');
+
+      final res = await http.get(url, headers: _jsonHeaders());
+
+      print('DEBUG getWasteCategories: statusCode=${res.statusCode}');
+
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG getWasteCategories ERROR: $e');
+      return {
+        'statusCode': 500,
+        'body': {'success': false, 'message': 'Error: $e'},
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> getWasteInfo() async {
+    try {
+      final url = Uri.parse('$baseUrl/api/waste/info');
+
+      final res = await http.get(url, headers: _jsonHeaders());
+
+      print('DEBUG getWasteInfo: statusCode=${res.statusCode}');
+
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG getWasteInfo ERROR: $e');
+      return {
+        'statusCode': 500,
+        'body': {'success': false, 'message': 'Error: $e'},
+      };
+    }
+  }
 }

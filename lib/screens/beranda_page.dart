@@ -335,6 +335,12 @@ class _BerandaPageState extends State<BerandaPage>
           child: BottomNavigationBar(
             currentIndex: _currentIndex,
             onTap: (i) {
+              // Handle waste detection navigation separately
+              if (i == 3) {
+                Navigator.pushNamed(context, '/waste-detection');
+                return;
+              }
+
               setState(() => _currentIndex = i);
               if (i == 0) {
                 _fabController.forward();
@@ -345,7 +351,7 @@ class _BerandaPageState extends State<BerandaPage>
             selectedItemColor: const Color(0xFF43A047),
             unselectedItemColor: Colors.grey[400],
             showUnselectedLabels: true,
-            type: BottomNavigationBarType.fixed,
+            type: BottomNavigationBarType.shifting,
             elevation: 0,
             backgroundColor: Colors.transparent,
             selectedLabelStyle: const TextStyle(
@@ -368,6 +374,11 @@ class _BerandaPageState extends State<BerandaPage>
                 icon: Icon(Icons.person_outline),
                 activeIcon: Icon(Icons.person),
                 label: 'Profile',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.delete_outlined),
+                activeIcon: Icon(Icons.delete),
+                label: 'Deteksi',
               ),
             ],
           ),
