@@ -22,7 +22,7 @@ class _PaymentPageState extends State<PaymentPage> {
       'options': [
         {
           'name': 'BCA',
-          'account': '1234567890',
+          'account': '1310888075',
           'holder': 'RuangHijau Foundation',
           'icon': Icons.account_balance,
           'color': Colors.blue,
@@ -55,7 +55,7 @@ class _PaymentPageState extends State<PaymentPage> {
       'options': [
         {
           'name': 'GoPay',
-          'number': '081234567890',
+          'number': '081228439520',
           'icon': Icons.account_balance_wallet,
           'color': Colors.green,
           'imagePath': 'assets/images/wallets/gopay.png',
@@ -69,27 +69,21 @@ class _PaymentPageState extends State<PaymentPage> {
         },
         {
           'name': 'DANA',
-          'number': '081234567890',
+          'number': '081228439520',
           'icon': Icons.account_balance_wallet,
           'color': Colors.blue,
           'imagePath': 'assets/images/wallets/dana.png',
         },
         {
           'name': 'ShopeePay',
-          'number': '081234567890',
+          'number': '085643288791',
           'icon': Icons.account_balance_wallet,
           'color': Colors.orange,
           'imagePath': 'assets/images/wallets/shopeepay.png',
         },
       ],
     },
-    {
-      'id': 'qris',
-      'name': 'QRIS',
-      'icon': Icons.qr_code_scanner,
-      'color': Colors.purple,
-      'description': 'Scan untuk pembayaran',
-    },
+    // ...existing code...
   ];
 
   // Format currency to Indonesian Rupiah

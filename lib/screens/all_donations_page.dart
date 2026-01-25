@@ -9,37 +9,19 @@ class AllDonationsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Sample donation history
-    final List<Map<String, dynamic>> donations = [
-      {
-        'donor': 'Andi Wijaya',
-        'amount': 500000,
-        'campaign': 'Bantu Korban Bencana Alam',
-        'date': '23 Des 2024',
-        'isAnonymous': false,
-      },
-      {
-        'donor': 'Anonim',
-        'amount': 250000,
-        'campaign': 'Renovasi Sekolah Daerah Terpencil',
-        'date': '22 Des 2024',
-        'isAnonymous': true,
-      },
-      {
-        'donor': 'Budi Santoso',
-        'amount': 1000000,
-        'campaign': 'Bantuan Makanan untuk Anak Yatim',
-        'date': '21 Des 2024',
-        'isAnonymous': false,
-      },
-      {
-        'donor': 'Siti Nurhaliza',
-        'amount': 300000,
-        'campaign': 'Bantu Korban Bencana Alam',
-        'date': '20 Des 2024',
-        'isAnonymous': false,
-      },
-    ];
+    // Donation history - fetch from backend/API
+    final List<Map<String, dynamic>> donations = [];
+
+    // Calculate total donations
+    final int totalDonations = donations.fold(
+      0,
+      (sum, donation) => sum + (donation['amount'] as int),
+    );
+
+    // Calculate unique campaigns
+    final Set<String> uniqueCampaigns = donations
+        .map((donation) => donation['campaign'] as String)
+        .toSet();
 
     return Scaffold(
       appBar: AppBar(
@@ -70,7 +52,7 @@ class AllDonationsPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      formatCurrency(2050000),
+                      formatCurrency(totalDonations),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
@@ -81,15 +63,15 @@ class AllDonationsPage extends StatelessWidget {
                 ),
                 Container(height: 40, width: 1, color: Colors.white30),
                 Column(
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       'Kampanye Dibantu',
                       style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      '3',
-                      style: TextStyle(
+                      '${uniqueCampaigns.length}',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -103,65 +85,86 @@ class AllDonationsPage extends StatelessWidget {
 
           // Donations List
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: donations.length,
-              itemBuilder: (context, index) {
-                final donation = donations[index];
-                final bool isAnonymous = donation['isAnonymous'] as bool;
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: CircleAvatar(
-                      backgroundColor: isAnonymous
-                          ? Colors.grey[400]
-                          : const Color(0xFF43A047),
-                      child: Icon(
-                        isAnonymous
-                            ? Icons.person_off
-                            : Icons.volunteer_activism,
-                        color: Colors.white,
-                      ),
-                    ),
-                    title: Text(
-                      donation['donor'] as String,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            child: donations.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 4),
-                        Text(
-                          donation['campaign'] as String,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
+                        Icon(
+                          Icons.volunteer_activism,
+                          size: 64,
+                          color: Colors.grey[400],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 16),
                         Text(
-                          donation['date'] as String,
+                          'Belum ada riwayat donasi',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[500],
+                            fontSize: 16,
+                            color: Colors.grey[600],
                           ),
                         ),
                       ],
                     ),
-                    trailing: Text(
-                      formatCurrency(donation['amount'] as int),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF43A047),
-                        fontSize: 16,
-                      ),
-                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: donations.length,
+                    itemBuilder: (context, index) {
+                      final donation = donations[index];
+                      final bool isAnonymous = donation['isAnonymous'] as bool;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          leading: CircleAvatar(
+                            backgroundColor: isAnonymous
+                                ? Colors.grey[400]
+                                : const Color(0xFF43A047),
+                            child: Icon(
+                              isAnonymous
+                                  ? Icons.person_off
+                                  : Icons.volunteer_activism,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: Text(
+                            donation['donor'] as String,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                donation['campaign'] as String,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                donation['date'] as String,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: Text(
+                            formatCurrency(donation['amount'] as int),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF43A047),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),

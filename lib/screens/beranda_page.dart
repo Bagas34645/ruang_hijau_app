@@ -994,39 +994,78 @@ class _BerandaPageState extends State<BerandaPage>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF66BB6A), Color(0xFF43A047)],
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to user profile
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Profil ${post['username']}'),
+                        backgroundColor: const Color(0xFF43A047),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF66BB6A), Color(0xFF43A047)],
+                      ),
+                      shape: BoxShape.circle,
                     ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 18,
-                    child: Icon(Icons.eco, color: Color(0xFF43A047), size: 20),
+                    child: const CircleAvatar(
+                      backgroundColor: Colors.white,
+                      radius: 18,
+                      child: Icon(
+                        Icons.eco,
+                        color: Color(0xFF43A047),
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post['username'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: Color(0xFF2E7D32),
+                  child: GestureDetector(
+                    onTap: () {
+                      // Navigate to user profile
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Profil ${post['username']}'),
+                          backgroundColor: const Color(0xFF43A047),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          duration: const Duration(seconds: 1),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '2 jam yang lalu',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                      ),
-                    ],
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post['username'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '2 jam yang lalu',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Container(
