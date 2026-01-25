@@ -267,7 +267,7 @@ class _CreateCampaignPageState extends State<CreateCampaignPage> {
           imageBytes = await _selectedImage!.readAsBytes();
           imageFilename =
               'campaign_${DateTime.now().millisecondsSinceEpoch}_${_selectedImage!.path.split('/').last}';
-          print('🖼️  Mobile image prepared: ${imageBytes!.length} bytes');
+          print('🖼️  Mobile image prepared: ${imageBytes.length} bytes');
         }
 
         print('📸 Image filename: $imageFilename');

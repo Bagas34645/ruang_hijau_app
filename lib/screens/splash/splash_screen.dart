@@ -81,25 +81,11 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _buildLogo() {
-    return Container(
-      height: 140,
+    return Image.asset(
+      'assets/images/icon_app.png',
       width: 140,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.green[400]!, Colors.green[600]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(70),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: const Icon(Icons.eco, size: 80, color: Colors.white),
+      height: 140,
+      fit: BoxFit.cover,
     );
   }
 

@@ -252,13 +252,11 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.green[100],
-            shape: BoxShape.circle,
-          ),
-          child: Icon(Icons.eco, size: 48, color: Colors.green[700]),
+        Image.asset(
+          'assets/images/icon_app.png',
+          width: 80,
+          height: 80,
+          fit: BoxFit.cover,
         ),
         const SizedBox(height: 24),
         Text(

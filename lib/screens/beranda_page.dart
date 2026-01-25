@@ -216,24 +216,11 @@ class _BerandaPageState extends State<BerandaPage>
         ),
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF66BB6A), Color(0xFF43A047)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF43A047).withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.eco, color: Colors.white, size: 26),
+            Image.asset(
+              'assets/images/icon_app.png',
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
             ),
             const SizedBox(width: 12),
             const Column(
@@ -587,136 +574,124 @@ class _BerandaPageState extends State<BerandaPage>
                             ),
                           )
                         : loadError != null
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.error_outline,
-                                        size: 44,
-                                        color: Colors.red[300],
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 44,
+                                    color: Colors.red[300],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    loadError!,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton(
+                                    onPressed: loadComments,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF43A047),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        loadError!,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.grey[700],
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      ElevatedButton(
-                                        onPressed: loadComments,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF43A047),
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: const Text('Coba lagi'),
-                                      ),
-                                    ],
+                                    ),
+                                    child: const Text('Coba lagi'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : comments.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.comment_outlined,
+                                  size: 48,
+                                  color: Colors.grey[300],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Belum ada komentar',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 14,
                                   ),
                                 ),
-                              )
-                            : comments.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.comment_outlined,
-                                          size: 48,
-                                          color: Colors.grey[300],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Belum ada komentar',
-                                          style: TextStyle(
-                                            color: Colors.grey[500],
-                                            fontSize: 14,
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: comments.length,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemBuilder: (context, index) {
+                              final comment = comments[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: const Color(
+                                        0xFF43A047,
+                                      ).withOpacity(0.2),
+                                      child: const Icon(
+                                        Icons.person,
+                                        size: 20,
+                                        color: Color(0xFF43A047),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            (comment['username'] as String?) ??
+                                                'User',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    controller: scrollController,
-                                    itemCount: comments.length,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                    ),
-                                    itemBuilder: (context, index) {
-                                      final comment = comments[index];
-                                      return Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 16),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 18,
-                                              backgroundColor:
-                                                  const Color(0xFF43A047)
-                                                      .withOpacity(0.2),
-                                              child: const Icon(
-                                                Icons.person,
-                                                size: 20,
-                                                color: Color(0xFF43A047),
-                                              ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            (comment['text'] as String?) ?? '',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[700],
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    (comment['username']
-                                                            as String?) ??
-                                                        'User',
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    (comment['text']
-                                                            as String?) ??
-                                                        '',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: Colors.grey[700],
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  Text(
-                                                    (comment['createdAt']
-                                                            as String?) ??
-                                                        'Baru saja',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[500],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            (comment['createdAt'] as String?) ??
+                                                'Baru saja',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[500],
                                             ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                   ),
                   // COMMENT INPUT
                   Container(
@@ -756,13 +731,15 @@ class _BerandaPageState extends State<BerandaPage>
                                 hintStyle: TextStyle(color: Colors.grey[400]),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey[300]!),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey[300]!),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
@@ -771,8 +748,7 @@ class _BerandaPageState extends State<BerandaPage>
                                     width: 2,
                                   ),
                                 ),
-                                contentPadding:
-                                    const EdgeInsets.symmetric(
+                                contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 12,
                                 ),
@@ -795,10 +771,7 @@ class _BerandaPageState extends State<BerandaPage>
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Icon(
-                                      Icons.send,
-                                      color: Colors.white,
-                                    ),
+                                  : const Icon(Icons.send, color: Colors.white),
                               onPressed: sendingComment ? null : sendComment,
                             ),
                           ),
@@ -1155,15 +1128,66 @@ class _BerandaPageState extends State<BerandaPage>
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(30),
-                    onTap: () {
+                    onTap: () async {
+                      if (_currentUserId == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Silakan login dulu untuk menyukai post',
+                            ),
+                            backgroundColor: Colors.red[400],
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final isCurrentlyLiked = post['isLiked'] ?? false;
+
+                      // Update UI immediately (optimistic update)
                       setState(() {
-                        post['isLiked'] = !post['isLiked'];
-                        if (post['isLiked']) {
+                        post['isLiked'] = !isCurrentlyLiked;
+                        if (!isCurrentlyLiked) {
                           post['likesCount']++;
                         } else {
                           post['likesCount']--;
                         }
                       });
+
+                      // Call API to sync with server
+                      try {
+                        if (!isCurrentlyLiked) {
+                          // Like the post
+                          await Api.likePost(post['id'], _currentUserId!);
+                        } else {
+                          // Unlike the post
+                          await Api.unlikePost(post['id'], _currentUserId!);
+                        }
+                      } catch (e) {
+                        // Revert on error
+                        setState(() {
+                          post['isLiked'] = isCurrentlyLiked;
+                          if (!isCurrentlyLiked) {
+                            post['likesCount']--;
+                          } else {
+                            post['likesCount']++;
+                          }
+                        });
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Gagal menyimpan like'),
+                            backgroundColor: Colors.red[400],
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        );
+                      }
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),

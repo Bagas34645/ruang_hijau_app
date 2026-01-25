@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
+      title: 'RuangHijau',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
@@ -103,7 +103,7 @@ class AuthHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ruang Hijau - Auth')),
+      appBar: AppBar(title: const Text('RuangHijau - Auth')),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

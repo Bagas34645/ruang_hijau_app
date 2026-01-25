@@ -654,7 +654,9 @@ class Api {
       }
 
       print('DEBUG submitFeedback: Requesting $url');
-      print('DEBUG submitFeedback: category=$category, rating=$rating, user_id=$userId');
+      print(
+        'DEBUG submitFeedback: category=$category, rating=$rating, user_id=$userId',
+      );
 
       final body = {
         'user_id': userId,
@@ -683,6 +685,64 @@ class Api {
     } catch (e) {
       print('DEBUG submitFeedback ERROR: $e');
       rethrow;
+    }
+  }
+
+  // --- LIKE POST ---
+  static Future<Map<String, dynamic>> likePost(int postId, int userId) async {
+    try {
+      final token = await _token();
+      final url = Uri.parse('$baseUrl/api/likes');
+
+      final body = {'post_id': postId, 'user_id': userId};
+
+      print('DEBUG likePost: Requesting $url');
+      print('DEBUG likePost: postId=$postId, userId=$userId');
+
+      final res = await http.post(
+        url,
+        headers: _jsonHeaders(token),
+        body: jsonEncode(body),
+      );
+
+      print('DEBUG likePost: statusCode=${res.statusCode}');
+      print('DEBUG likePost: body=${res.body}');
+
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG likePost ERROR: $e');
+      return {
+        'statusCode': 500,
+        'body': {'message': 'Error: $e'},
+      };
+    }
+  }
+
+  // --- UNLIKE POST ---
+  static Future<Map<String, dynamic>> unlikePost(int postId, int userId) async {
+    try {
+      final token = await _token();
+      final url = Uri.parse('$baseUrl/api/likes/$postId/$userId');
+
+      print('DEBUG unlikePost: Requesting DELETE $url');
+
+      final res = await http.delete(url, headers: _jsonHeaders(token));
+
+      print('DEBUG unlikePost: statusCode=${res.statusCode}');
+
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG unlikePost ERROR: $e');
+      return {
+        'statusCode': 500,
+        'body': {'message': 'Error: $e'},
+      };
     }
   }
 }
