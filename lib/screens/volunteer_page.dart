@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api.dart';
 
 class VolunteerPage extends StatefulWidget {
   const VolunteerPage({super.key});
@@ -18,6 +20,7 @@ class _VolunteerPageState extends State<VolunteerPage> {
 
   String? selectedSkill;
   String? selectedAvailability;
+  bool _isSubmitting = false;
 
   final List<String> skills = [
     'Penggalangan Dana',
@@ -37,7 +40,7 @@ class _VolunteerPageState extends State<VolunteerPage> {
     'Fleksibel',
   ];
 
-  void submitVolunteerForm(Map<String, dynamic> campaign) {
+  void submitVolunteerForm(Map<String, dynamic> campaign) async {
     if (_formKey.currentState!.validate()) {
       if (selectedSkill == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -53,39 +56,121 @@ class _VolunteerPageState extends State<VolunteerPage> {
         return;
       }
 
-      // Show success dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Pendaftaran Berhasil!'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Terima kasih telah mendaftar sebagai relawan!'),
-              const SizedBox(height: 16),
-              Text('Kampanye: ${campaign['title']}'),
-              Text('Nama: ${_nameController.text}'),
-              Text('Keahlian: $selectedSkill'),
-              Text('Ketersediaan: $selectedAvailability'),
-              const SizedBox(height: 16),
-              const Text(
-                'Tim kami akan segera menghubungi Anda melalui email atau telepon.',
-                style: TextStyle(fontSize: 12),
+      setState(() => _isSubmitting = true);
+
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getInt('user_id');
+
+        print('DEBUG registerVolunteer: userId=$userId');
+        print('DEBUG registerVolunteer: campaign=$campaign');
+
+        if (userId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Silakan login terlebih dahulu')),
+          );
+          setState(() => _isSubmitting = false);
+          return;
+        }
+
+        // Prepare data for API
+        final data = {
+          'user_id': userId,
+          'campaign_id': campaign['id'] ?? 1,
+          'name': _nameController.text,
+          'email': _emailController.text,
+          'phone': _phoneController.text,
+          'address': _addressController.text,
+          'skill': selectedSkill,
+          'availability': selectedAvailability,
+          'experience': _experienceController.text,
+          'motivation': _motivationController.text,
+        };
+
+        print('DEBUG registerVolunteer: data=$data');
+
+        // Call API
+        final res = await Api.registerVolunteer(data);
+
+        print(
+          'DEBUG registerVolunteer: response statusCode=${res['statusCode']}',
+        );
+        print('DEBUG registerVolunteer: response body=${res['body']}');
+
+        if (!mounted) return;
+
+        if (res['statusCode'] == 200 || res['statusCode'] == 201) {
+          // Show success dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  SizedBox(width: 12),
+                  Text('Pendaftaran Berhasil!'),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Terima kasih telah mendaftar sebagai relawan!'),
+                  const SizedBox(height: 16),
+                  Text('Kampanye: ${campaign['title']}'),
+                  Text('Nama: ${_nameController.text}'),
+                  Text('Keahlian: $selectedSkill'),
+                  Text('Ketersediaan: $selectedAvailability'),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tim kami akan segera menghubungi Anda melalui email atau telepon.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
+          );
+        } else {
+          final errorMessage =
+              res['body']?['message'] ??
+              'Gagal mendaftar sebagai relawan. Silakan coba lagi.';
+          print('DEBUG registerVolunteer: error=$errorMessage');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $errorMessage'),
+              backgroundColor: Colors.red[400],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        print('DEBUG registerVolunteer: exception=$e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Terjadi kesalahan: $e'),
+            backgroundColor: Colors.red[400],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -369,16 +454,31 @@ class _VolunteerPageState extends State<VolunteerPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => submitVolunteerForm(campaign),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => submitVolunteerForm(campaign),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
+                    disabledBackgroundColor: Colors.grey[400],
                   ),
-                  child: const Text(
-                    'Daftar Sebagai Relawan',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Daftar Sebagai Relawan',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
 

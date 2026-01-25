@@ -821,4 +821,39 @@ class Api {
       };
     }
   }
+
+  // --- Volunteer ---
+  static Future<Map<String, dynamic>> registerVolunteer(
+    Map<String, dynamic> body,
+  ) async {
+    final url = Uri.parse('$baseUrl/api/volunteers/register');
+    final token = await _token();
+    try {
+      print('DEBUG registerVolunteer: Requesting $url');
+      print('DEBUG registerVolunteer: body=$body');
+      final res = await http
+          .post(url, headers: _jsonHeaders(token), body: jsonEncode(body))
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print(
+                'DEBUG registerVolunteer: Request TIMEOUT after 10 seconds',
+              );
+              throw TimeoutException('Request timeout');
+            },
+          );
+      print('DEBUG registerVolunteer: statusCode=${res.statusCode}');
+      print('DEBUG registerVolunteer: body=${res.body}');
+      return {
+        'statusCode': res.statusCode,
+        'body': res.body.isNotEmpty ? jsonDecode(res.body) : null,
+      };
+    } catch (e) {
+      print('DEBUG registerVolunteer ERROR: $e');
+      return {
+        'statusCode': 500,
+        'body': {'success': false, 'message': 'Error: $e'},
+      };
+    }
+  }
 }

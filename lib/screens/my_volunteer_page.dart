@@ -1,12 +1,70 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class MyVolunteerPage extends StatelessWidget {
+class MyVolunteerPage extends StatefulWidget {
   const MyVolunteerPage({super.key});
+
+  @override
+  State<MyVolunteerPage> createState() => _MyVolunteerPageState();
+}
+
+class _MyVolunteerPageState extends State<MyVolunteerPage> {
+  List<Map<String, dynamic>> volunteerActivities = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVolunteerActivities();
+  }
+
+  Future<void> _loadVolunteerActivities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final volunteersJson =
+          prefs.getStringList('volunteer_registrations') ?? [];
+
+      print(
+        'DEBUG: Loaded ${volunteersJson.length} volunteer registrations from SharedPreferences',
+      );
+
+      setState(() {
+        volunteerActivities = volunteersJson
+            .map((json) {
+              try {
+                return Map<String, dynamic>.from(
+                  Map.from(
+                    json.split('|').asMap().entries.fold({}, (map, e) {
+                      if (e.key == 0) map['campaign'] = e.value;
+                      if (e.key == 1) map['role'] = e.value;
+                      if (e.key == 2) map['status'] = 'Aktif';
+                      if (e.key == 3) map['date'] = e.value;
+                      if (e.key == 4) map['hours'] = 0;
+                      return map;
+                    }),
+                  ),
+                );
+              } catch (e) {
+                print('DEBUG: Error parsing volunteer: $e');
+                return null;
+              }
+            })
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('DEBUG: Error loading volunteer activities: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     // Volunteer activities - fetch from backend/API
-    final List<Map<String, dynamic>> volunteerActivities = [];
+    final List<Map<String, dynamic>> activities = volunteerActivities;
 
     // Calculate total hours
     final int totalHours = volunteerActivities.fold(
