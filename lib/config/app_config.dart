@@ -13,7 +13,7 @@ class AppConfig {
     if (kDebugMode) {
       // Web atau emulator
       if (kIsWeb) {
-        return 'ruanghijau.web.id';
+        return 'https://ruanghijau.web.id';
         // return 'http://192.168.18.122:5000';
       }
 
@@ -21,19 +21,19 @@ class AppConfig {
       if (Platform.isAndroid) {
         // Gunakan 10.0.2.2 untuk Android emulator
         // Atau ganti dengan IP address PC Anda untuk physical device
-        return 'ruanghijau.web.id';
+        return 'https://ruanghijau.web.id';
         // return 'http://192.168.18.122:5000';
       }
 
       // iOS
       if (Platform.isIOS) {
-        return 'ruanghijau.web.id';
+        return 'https://ruanghijau.web.id';
         // return 'http://192.168.18.122:5000';
       }
     }
 
     // Production environment - gunakan domain actual
-    return 'ruanghijau.web.id';
+    return 'https://ruanghijau.web.id';
     // return 'http://192.168.18.122:5000';
   }
 
